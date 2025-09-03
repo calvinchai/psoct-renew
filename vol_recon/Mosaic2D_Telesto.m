@@ -110,7 +110,7 @@ NbPix = Experiment.NbPix;
 
 X       = Experiment.X_Mean;           Y       = Experiment.Y_Mean;         % Y = fliplr(Y);
 X       = X-min(X(:))+1;               Y       = Y-min(Y(:))+1;
-sizerow = 330-XPixClip;                sizecol = 350-YPixClip;
+sizerow = 350-XPixClip;                sizecol = 350-YPixClip;
 MXL     = max(X(:))+sizerow-1;         MYL     = max(Y(:))+sizecol-1;
 %%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -178,35 +178,35 @@ for s = 1:size(sliceidx,2)
                 columns  = Y(jj,ii):Y(jj,ii)+sizecol-1;
                 row      = X(jj,ii):X(jj,ii)+sizerow-1;
 
-                if isFiji;  currtile = MapIndex(jj,ii);
-                else;       currtile = (sliceid_in-1)*Experiment.TilesPerSlice+MapIndex(jj,ii); 
-                end
-                
+                % if isFiji;  currtile = MapIndex(jj,ii);
+                % else;       currtile = (sliceid_in-1)*Experiment.TilesPerSlice+MapIndex(jj,ii); 
+                % end
+                currtile = MapIndex(jj,ii);
                 % load/generate I (2D image)
                 switch filetype
                     case 'nifti'
-%                         if strcmpi(modality,'mus')
-%                             Imag=[indir_curr filesep 'test_processed_' sprintf('%03i',currtile) '_cropped.nii'];
-%                             I3 = readnifti(Imag); 
-%                             if ~isa(I3, 'single'); I3 = single(I3);end
-%                             if canUseGPU(); I3 =  gpuArray(I3);end
-% 
-%                             I3 = I3(XPixClip+1:end,YPixClip+1:end,:);
-%                             sz = size(I3);
-%                             I3 = I3(:,:,end:-1:1);
-%                             I3 = 10.^(I3/10); 
-% 
-%                             data =  zeros(sz,'like',I3);
-%                             for z=1:sz(3)-1
-%                                 data(:,:,z) = I3(:,:,z)./(sum(I3(:,:,z+1:end),3))/2/0.0025;
-%                             end
-%                             I = squeeze(mean(data(:,:,5:70),3)); %figure;plot(squeeze(mean(data,[1 2])))
-%                         else % orientation, aip, mip, retardance
-%                             Imag=[indir_curr filesep 'test_processed_' sprintf('%03i',currtile) '_' lower(modality) '.nii'];
-%                             I = niftiread(Imag);
-%                             %if ~isa(I, 'single'); I = single(I);end
-%                             I = I(XPixClip+1:end,YPixClip+1:end);
-%                         end
+                        if strcmpi(modality,'mus')
+                            Imag=[indir_curr filesep 'test_processed_' sprintf('%03i',currtile) '_cropped.nii'];
+                            I3 = readnifti(Imag); 
+                            if ~isa(I3, 'single'); I3 = single(I3);end
+                            if canUseGPU(); I3 =  gpuArray(I3);end
+
+                            I3 = I3(XPixClip+1:end,YPixClip+1:end,:);
+                            sz = size(I3);
+                            I3 = I3(:,:,end:-1:1);
+                            I3 = 10.^(I3/10); 
+
+                            data =  zeros(sz,'like',I3);
+                            for z=1:sz(3)-1
+                                data(:,:,z) = I3(:,:,z)./(sum(I3(:,:,z+1:end),3))/2/0.0025;
+                            end
+                            I = squeeze(mean(data(:,:,5:70),3)); %figure;plot(squeeze(mean(data,[1 2])))
+                        else % orientation, aip, mip, retardance
+                            Imag=[indir_curr filesep 'mosaic_' sprintf('%03i',sliceid_in*2-1) '_image_' sprintf('%04i',currtile) '_processed_' lower(modality) '.nii'];
+                            I = niftiread(Imag);
+                            %if ~isa(I, 'single'); I = single(I);end
+                            I = I(XPixClip+1:end,YPixClip+1:end);
+                        end
                     case 'mat'
                         Imag=[indir_curr filesep modality_mat '_' sprintf('%03i',currtile) '.mat'];
                             S = whos('-file',Imag);

@@ -74,7 +74,7 @@ function [ ExperimentBasic ] = PrepareBasicExperiment( ParameterFile, TLSSLog, E
 %%%%%%%%%%%%%%    GET BASIC SCAN INFO FROM OctScanInfoLog.txt   %%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 load(ParameterFile);
-addpath('/autofs/cluster/octdata2/users/Hui/tools/rob_utils/OCTBasic/proc2d/tlss_utils');
+%addpath('/autofs/cluster/octdata2/users/Hui/tools/rob_utils/OCTBasic/proc2d/tlss_utils');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%    SET SCAN-SPECIFIC PATHS+STUFF    %%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -1,29 +1,29 @@
 clear
-addpath('/autofs/cluster/octdata2/users/Hui/tools/dg_utils/vol_recon_beta');
+addpath('/space/megaera/1/users/kchai/code/psoct-renew/vol_recon');
 logflag = false;
-ParameterFile  = ['/autofs/cluster/octdata2/users/Chao/caa/caa_6/occipital/process_20220209_run3/Parameters.mat'];
+ParameterFile  = ['/space/megaera/1/users/kchai/code/psoct-renew/Parameters.mat'];
 %P = whos('-file',ParameterFile);
 if exist(ParameterFile,'file'); return; end
 %% Aquisition Parameters 
-Scan.SampleName          = 'CAA_6 Occipital Run3';
-Scan.Date                = '20220106';
-Scan.OCTOperator         = 'Bill';
-Scan.PostProcessOperator = 'Dylan';
-Scan.ImagingNotes        = 'Saved crop volume, saved surface, saved complex...';
+Scan.SampleName          = 'I80 Premotor Slab';
+Scan.Date                = '20250513';
+Scan.OCTOperator         = 'Chris';
+Scan.PostProcessOperator = 'Nate';
+Scan.ImagingNotes        = 'I80 human hemi slab with premotor cortex';
 Scan.FilePrefix          = 'test_processed_';
 Scan.Objective           = '40x';
 Scan.System              = 'Telesto'; IsTelesto = strcmpi(Scan.System,'Telesto');
 
-Scan.RawDataDir          = '/autofs/cluster/octdata2/users/Chao/caa/caa_6/occipital/20220209_run3';
-Scan.ProcessDir          = '/autofs/cluster/octdata2/users/Chao/caa/caa_6/occipital/process_20220209_run3';
-Scan.TLSS_log            = 'run3.txt'; % needed?
+Scan.RawDataDir          = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/RawData';
+Scan.ProcessDir          = '/space/megaera/1/users/kchai/code/psoct-renew/process';
+Scan.TLSS_log            = 'TL_serial_shell_v31_20250509_092640_log.txt'; % needed?
 Scan.First_Tile          = 1;
 
-Scan.Thickness           = 50;   % um  50um serial scanning; 100um cutting
-Scan.FoV                 = 3600;  % um
-Scan.NbPixels            = 360;   % pix
-Scan.StepSize            = 320;   % pix
-Scan.CropDepth           = 100;   % pix  size(niftiread([Scan.RawDataDir '/test_processed_001_cropped.nii']));
+Scan.Thickness           = 500;   % um  50um serial scanning; 100um cutting
+Scan.FoV                 = 3500;  % um
+Scan.NbPixels            = 350;   % pix
+Scan.StepSize            = 2800;   % pix
+Scan.CropDepth           = 500;   % pix  size(niftiread([Scan.RawDataDir '/test_processed_001_cropped.nii']));
 
 in_planeRes              = 0.010;  % mm % Scan.FoV/Scan.NbPixels/1000;
 thru_planeRes            = 0.0025;% mm
@@ -42,7 +42,7 @@ StackNii       = [ProcDir filesep 'StackNii'];
 MapIndex       = [ProcDir filesep 'MapIndex'];
 
 OctScanInfoLog = [ProcDir filesep 'OctScanInfoLog.txt'];
-TLSSLog        = [ProcDir filesep 'run3.txt'];
+TLSSLog        = [ProcDir filesep 'TL_serial_shell_v31_20250509_092640_log.txt'];
 ExpBasic       = [ProcDir filesep 'ExperimentBasic.mat'];
 ExpFiji        = [StitchingFiji filesep 'Experiment_Fiji.mat'];
 % Macro_ijm is defined later.
@@ -86,7 +86,7 @@ GrayRangeCheck = ...
 if any(GrayRangeCheck)
     modalid = find(GrayRangeCheck);
 
-    Mosaic2D.sliceidx   = [1;1;1]; %slice2 in; slice2 out; run1
+    Mosaic2D.sliceidx   = [5;5;1]; %slice2 in; slice2 out; run1
     Mosaic2D.imresize   = 0; 
 
     Mosaic2D.InFileType = 'nifti'; % 'mat'

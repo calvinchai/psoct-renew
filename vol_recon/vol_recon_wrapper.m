@@ -1,6 +1,6 @@
 clear 
 
-addpath('/autofs/cluster/octdata2/users/Hui/tools/dg_utils/vol_recon_beta')
+addpath('/space/megaera/1/users/kchai/code/psoct-renew/vol_recon')
 %% Enface 
 nWorker = 12;
 SaveTiff_Enface_script( ParameterFile, nWorker )
