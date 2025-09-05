@@ -2,7 +2,7 @@
 function recalculate_biref_orientation_I80(mosaicnum)
 mosaicnum=str2num(mosaicnum);
 % Define file path
-file_path = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/RawData/';
+file_path = '/local_mount/space/megaera/2/users/kchai/000052/tile_data/';
 if mod(mosaicnum,2)==1
     all_tissues = [1:588];
 else
