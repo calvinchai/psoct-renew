@@ -3,6 +3,7 @@ function recalculate_biref_orientation_I80(mosaicnum)
 mosaicnum=str2num(mosaicnum);
 % Define file path
 file_path = '/local_mount/space/megaera/2/users/kchai/000052/tile_data/';
+outdir = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/reprocessed/';
 if mod(mosaicnum,2)==1
     all_tissues = [1:588];
 else
@@ -437,7 +438,7 @@ for tilenum = all_tissues
 
             slopes = [];
             for tempi = 0:5:(iter_len-1)
-                z_start = round(surf(i,j));
+                z_start = max(1,round(surf(i,j)));
                 z_end = min(nz, z_start + base_len + tempi);
                 z_range = z_start:z_end;
                 % Extract V segment
@@ -517,7 +518,7 @@ for tilenum = all_tissues
     colormap(hsv);
     caxis([-90 90]);
     title('after');
-    outdir = ['/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/reprocessed/' num2str(mosaicnum) '/'];
+    outdir = [outdir num2str(mosaicnum) '/'];
     if ~exist(outdir, 'dir')
     mkdir(outdir);
     end
@@ -579,7 +580,7 @@ for tilenum = all_tissues
     title('after');
 
 
-    outdir = ['/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/reprocessed/' num2str(mosaicnum) '/'];
+    % outdir = [outdir num2str(mosaicnum) '/'];
     if ~exist(outdir, 'dir')
     mkdir(outdir);
     end
