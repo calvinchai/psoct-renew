@@ -1,9 +1,9 @@
 clear
-addpath('/local_mount/space/megaera/1/users/kchai/code/psoct-renew/vol_recon');
+addpath('/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/vol_recon_proj_NB_2025');
 
 t = tic;
 % next step sets path for parameter file put it in your processed directory
-ParameterFile  = ['/local_mount/space/megaera/1/users/kchai/code/psoct-renew/Parameters.mat'];
+ParameterFile  = ['/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/ProcessedData/Parameters.mat'];
 %P = whos('-file',ParameterFile);
 if exist(ParameterFile,'file'); warning(' --- ParameterFile already exists. Script is stopped to avoid overwriting. --- ');return; end
 %% Aquisition Parameters 
@@ -13,13 +13,13 @@ Scan.Date                = '05_13_2025';% date of acquisition
 Scan.OCTOperator         = 'Chris';% who acquired the data
 Scan.PostProcessOperator = 'Nate';% who is processing the data
 Scan.ImagingNotes        = 'I80 human hemi slab with premotor cortex';% put any additional notes
-Scan.SaveMethod          = 'spectral';  % either "spectral", "complex", or "surfacefinding"
+Scan.SaveMethod          = 'complex';  % either "spectral", "complex", or "surfacefinding"
 Scan.TiltedIllumination  = 'Yes'; % either "Yes" or "No"
 
 % Detail the input file name format for the raw data
 if contains('spectral',Scan.SaveMethod)
     Scan.FilePrefix      = {'mosaic_*_normal_*.nii','mosaic_*_tilted_*.nii'}; 
-    Scan.FileNameFormat  = 'mosaic_%03i_image_%03i_x_%06i_y_%06i_z_%06i_r_%06i_normal_spectral_%04i.nii'; % Only used as a template, do not need 'tilted variant'
+    Scan.FileNameFormat  = 'mosaic_%03i_image_%04i_x_%06i_y_%06i_z_%06i_r_%06i_normal_spectral_%04i.nii'; % Only used as a template, do not need 'tilted variant'
     Scan.CropMethod      = 'none'; % either "none", "surface", or "focus"
 elseif contains('surfacefinding',Scan.SaveMethod)
     % Scan.FilePrefix      = {'test_processed_'};
@@ -43,19 +43,19 @@ Scan.Objective           = '10x'; % what objective was used, this is normally 10
 Scan.System              = 'Telesto'; IsTelesto = strcmpi(Scan.System,'Telesto');% 
 Scan.Bath_Solution       = 'Mineraloil'; % what imaging medium was
 
-Scan.RawDataDir          = '/autofs/cluster/connects1/data/Case_I58_Brainstem/';
-Scan.ProcessDir          = '/local_mount/space/megaera/1/users/kchai/code/psoct-renew/process';
-Scan.TLSS_log            = 'TL_serial_shell_v31_20250131_182527_log.txt'; % used for creating ExperimentBasic
+Scan.RawDataDir          = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/RawData';
+Scan.ProcessDir          = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/ProcessedData';
+Scan.TLSS_log            = 'TL_serial_shell_v31_20250509_092640_log.txt'; % used for creating ExperimentBasic
 Scan.ZStageConfig        = 'Stacked'; % either "Single" or "Stacked"
 Scan.First_Tile          = 1; 
 
-Scan.Thickness           = 300;   % um  How thick sections were
+Scan.Thickness           = 500;   % um  How thick sections were
 Scan.FoV                 = 3500;  % um  Get this from the acquisition software
-Scan.NbPixels            = 700;   % pix  Get this from the acquisition software
+Scan.NbPixels            = 350;   % pix  Get this from the acquisition software
 Scan.StepSize            = 2800;   % um  Get this from the log file
 if strcmpi(Scan.TiltedIllumination,'Yes')
     Scan.FoV_tilt             = 2000;  % um  Along shorter (X) axis, confined by physical tilting geometry
-    Scan.NbPixels_tilt        = 400   % pix  Along shorter (X) axis
+    Scan.NbPixels_tilt        = 200;   % pix  Along shorter (X) axis
     Scan.StepSize_tilt        = 1600;   % pix  Along shorter (X) axis
     Scan.First_Tile_tilt      = 1;
 end
@@ -93,9 +93,9 @@ ExpFiji         = [ProcDir '/Experiment_Fiji.mat'];
 Processed3D.indir         = RawDataDir; % Spectral or Complex files
 Processed3D.input_format  = Scan.FileNameFormat; % Spectral or Complex file format
 Processed3D.outdir        = Proc3D;
-Processed3D.output_format = 'mosaic_%03i_image_%03i_processed_[modality].mat'; % '[modality]_mosaic_%03i_image_%04i.nii';
+Processed3D.output_format = 'mosaic_%03i_image_%04i_processed_[modality].nii'; % '[modality]_mosaic_%03i_image_%04i.nii';
 Processed3D.outputstr     = {'dBI3D','R3D','O3D','biref'};%,'mus','dBI_crop','R3D_crop','O3D_crop'}; % Strings used for [modality]
-Processed3D.save          = Processed3D.outputstr([1,2,3,4]); % ([1,2,3,4]);
+Processed3D.save          = Processed3D.outputstr([4]); % ([1,2,3,4]);
 Processed3D.dispComp      = '/autofs/cluster/octdata2/users/Hui/tools/dg_utils/spectralprocess/dispComp/mineraloil_LSM03/dispersion_compensation_LSM03_mineraloil_20240829/LSM03_mineral_oil_placecorrectionmeanall2.dat';
 Processed3D.RollOff       = '/cluster/octdata2/users/TelestoCalibration/RollOff_Spectrum.mat';
 
@@ -117,12 +117,10 @@ Enface.indir          = Scan.RawDataDir; % [ProcDir, '/MAT2d']; % [RawDataDir];
 Enface.inputstr       = {'aip','mip','retardance','orientation','surface_finding','biref','mus'}; % Strings used for [modality]
 Enface.save           = Enface.inputstr([1,2,3,4,5,6]); % ,5,6,7]); % inputstr [modality] to save 
 Enface.input_format   = 'mosaic_%03i_image_%04i_processed_[modality].nii';
-
 Enface.outdir         = Enface_Fiji;
 Enface.outputstr      = {'aip','mip','retardance','orientation','surface_finding','biref','mus'}; % Strings used for [modality]
 Enface.save_tiff      = Enface.outputstr([1,2,3,4,6]); % outputstr [modality] to save 
-Enface.output_format  = 'mosaic_%03i_image_%03i_processed_[modality].nii'; % Needs to match file type used for WriteMacro_Serpentine.m
-Enface.file_format  = 'mosaic_%03i_image_%03i_processed_[modality].mat'; % Needs to match file type used for WriteMacro_Serpentine.m
+Enface.output_format  = 'mosaic_%03i_image_%04i_processed_[modality].nii'; % Needs to match file type used for WriteMacro_Serpentine.m
 
 % Check enface file name formats
 fprintf('Input file naming format for Enface and Mosaic2D \n\n');
@@ -147,7 +145,7 @@ load(ExpBasic);
 % Parameters.SliceID = [5:7]; % Mosaic 9, 10, 11, 12, 13, 14 (to run birefringence calculation)
 % Parameters.SliceID = [4:11]; % Mosaic 7 to 22 
 % Parameters.SliceID = [13:19]; % Mosaic 25 to 38 (to run stitching) - stopped at mosaic_030_image_400
-Parameters.SliceID = [10:11]; % Slices to try 3D stitching on (Kaidong)
+Parameters.SliceID = [5:11,13:26]; % Slices to try 3D stitching on (Kaidong)
 
 mosaic_nums = [];
 tile_nums = [];
@@ -209,9 +207,9 @@ mosaic_num = 9;
 mosaic_dim = [ExperimentBasic.Y_tile, ExperimentBasic.X_tile];
 transpose_flag = 1;
 % Only works for Mosaic 1 at the moment
-% [c_enface,c,~] = get_enface_concatenate(Enface.indir,Enface.input_format,view_modality,mosaic_num,mosaic_dim,1,transpose_flag);
-% view3D(c_enface)
-% figure; histogram(c_enface)
+[c_enface,c,~] = get_enface_concatenate(Enface.indir,Enface.input_format,view_modality,mosaic_num,mosaic_dim,1,transpose_flag);
+view3D(c_enface)
+figure; histogram(c_enface)
 
 
 %%
