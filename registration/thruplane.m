@@ -6,12 +6,13 @@ parpool_num = 10;
 
 basename1 = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/ProcessedData/Preliminary_stitching_noComputeOverlap/';
 basename2 = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/ProcessedData/Preliminary_stitching_noComputeOverlap/';
+slice_numbers = [8, 9];
 
 disp('start parpool');
 poolobj = parpool(parpool_num);
 disp('parpool started');
 
-for slice = 8
+for slice = slice_numbers
     % % read first set
     slice_id1 = slice*2-1;
     slice_id2 = slice*2;
