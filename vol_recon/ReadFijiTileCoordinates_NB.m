@@ -1,4 +1,4 @@
-function [ Experiment_Fiji ] = ReadFijiTileCoordinates( ParameterFile, saveflag )
+function [ Experiment_Fiji ] = ReadFijiTileCoordinates_NB( ParameterFile, saveflag )
 %
 % [ Experiment_Fiji ] = ReadFijiTileCoordinates( ParameterFile, saveflag )
 %   Improve coordinates from registered coordinates files of Fiji computed overlap
@@ -240,19 +240,19 @@ step_x          = median(   diff(all_coords_x{1,1}, 1, 1),           'all','omit
 matrix_x        = repmat(   [1: step_x : step_x * X_tile].',    [1 Y_tile]);
 offset_X        = median(   diff(all_coords_x{1,1}, 1, 2),           'all','omitnan'); offset_X = round(offset_X);
 offset_map_X    = repmat(   [1:Y_tile]-1,                       [X_tile,1])         *offset_X;
-% Method_2.X_Mean = matrix_x + offset_map_X;
-% Method_2.step_x = step_x;
-% Method_2.offset_X = offset_X;
+Method_2.X_Mean = matrix_x + offset_map_X;
+Method_2.step_x = step_x;
+Method_2.offset_X = offset_X;
 
 step_y          = median(   diff(all_coords_y{1,1}, 1, 2),           'all','omitnan'); step_y = round(step_y);
 matrix_y        = repmat(   [1: step_y : step_y * Y_tile],      [X_tile 1]);
 offset_Y        = median(   diff(all_coords_y{1,1}, 1, 1),           'all','omitnan'); offset_Y = round(offset_Y);
 offset_map_Y    = repmat(   [1:X_tile].'-1,                     [1,Y_tile])         *offset_Y;
-% Method_2.Y_Mean = matrix_y + offset_map_Y;
-% Method_2.step_y = step_y;
-% Method_2.offset_Y = offset_Y;
-% 
-% Experiment_Fiji.Method_2 = Method_2;
+Method_2.Y_Mean = matrix_y + offset_map_Y;
+Method_2.step_y = step_y;
+Method_2.offset_Y = offset_Y;
+
+Experiment_Fiji.Method_2 = Method_2;
 
 switch Method
     case 1
@@ -268,9 +268,10 @@ end
 
 % Find tiles that were NaN for all slices - exclude in Mosaic)
 Experiment_Fiji.Nantile_Prc = sum(isnan(Experiment_Fiji.X_Tot),3)/size(Experiment_Fiji.X_Tot,3);
-% Experiment_Fiji.X_Mean(nantiles) = nan;
-% Experiment_Fiji.Y_Mean(nantiles) = nan;
-%
+nantiles = Experiment_Fiji.Nantile_Prc>0.95; % Moved this up from below
+Experiment_Fiji.X_Mean(nantiles) = nan;
+Experiment_Fiji.Y_Mean(nantiles) = nan;
+
 % nantiles = Experiment_Fiji.Nantile_Prc>0.95;
 
 nantiles = isnan(Experiment_Fiji.X_Mean);
@@ -308,19 +309,19 @@ if(strcmpi(Scan.TiltedIllumination,'Yes') == 1)
     matrix_x        = repmat(   [1: step_x : step_x * X_tile].',    [1 Y_tile]);
     offset_X        = median(   diff(all_coords_x{2,1}, 1, 2),           'all','omitnan'); offset_X = round(offset_X);
     offset_map_X    = repmat(   [1:Y_tile]-1,                       [X_tile,1])         *offset_X;
-    % Method_2.X_Mean_tilt = matrix_x + offset_map_X;
-    % Method_2.step_x_tilt = step_x;
-    % Method_2.offset_X_tilt = offset_X;
+    Method_2.X_Mean_tilt = matrix_x + offset_map_X;
+    Method_2.step_x_tilt = step_x;
+    Method_2.offset_X_tilt = offset_X;
 
     step_y          = median(   diff(all_coords_y{2,1}, 1, 2),           'all','omitnan'); step_y = round(step_y);
     matrix_y        = repmat(   [1: step_y : step_y * Y_tile],      [X_tile 1]);
     offset_Y        = median(   diff(all_coords_y{2,1}, 1, 1),           'all','omitnan'); offset_Y = round(offset_Y);
     offset_map_Y    = repmat(   [1:X_tile].'-1,                     [1,Y_tile])         *offset_Y;
-    % Method_2.Y_Mean_tilt = matrix_y + offset_map_Y;
-    % Method_2.step_y_tilt = step_y;
-    % Method_2.offset_Y_tilt = offset_Y;
-    % 
-    % Experiment_Fiji.Method_2_tilt = Method_2;
+    Method_2.Y_Mean_tilt = matrix_y + offset_map_Y;
+    Method_2.step_y_tilt = step_y;
+    Method_2.offset_Y_tilt = offset_Y;
+
+    Experiment_Fiji.Method_2_tilt = Method_2;
 
     switch Method
         case 1
@@ -336,9 +337,10 @@ if(strcmpi(Scan.TiltedIllumination,'Yes') == 1)
 
     % Find tiles that were NaN for all slices - exclude in Mosaic)
     Experiment_Fiji.Nantile_Prc_tilt = sum(isnan(Experiment_Fiji.X_Tot_tilt),3)/size(Experiment_Fiji.X_Tot_tilt,3);
-    % Experiment_Fiji.X_Mean(nantiles) = nan;
-    % Experiment_Fiji.Y_Mean(nantiles) = nan;
-    %
+    nantiles = Experiment_Fiji.Nantile_Prc>0.95; % Moved this up from below
+    Experiment_Fiji.X_Mean(nantiles) = nan;
+    Experiment_Fiji.Y_Mean(nantiles) = nan;
+
     % nantiles = Experiment_Fiji.Nantile_Prc>0.95;
 
     nantiles = isnan(Experiment_Fiji.X_Mean_tilt);

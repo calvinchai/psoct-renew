@@ -74,7 +74,7 @@ function [ ExperimentBasic ] = PrepareBasicExperiment( ParameterFile, TLSSLog, E
 %%%%%%%%%%%%%%    GET BASIC SCAN INFO FROM OctScanInfoLog.txt   %%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 load(ParameterFile);
-%addpath('/autofs/cluster/octdata2/users/Hui/tools/rob_utils/OCTBasic/proc2d/tlss_utils');
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%    SET SCAN-SPECIFIC PATHS+STUFF    %%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -96,11 +96,14 @@ for ss = 1:length(sliceid)
     
     %%%% To read in experiment info (from stage computer)
     disp(' Reading TLSS log file...');
-    ExperimentBasic = ReadTLSSLogFile(fid, sliceid(ss));
+    ExperimentBasic = ReadTLSSLogFile(ParameterFile, fid, sliceid(ss));
     
     %%% If telesto, flip mapindex (tiles start in top right, not top left)
     if strcmpi(Scan.System,'Telesto')
         ExperimentBasic.MapIndex_Tot = fliplr(ExperimentBasic.MapIndex_Tot);
+        if strcmpi(Scan.TiltedIllumination,'Yes')
+            ExperimentBasic.MapIndex_Tot_tilt = fliplr(ExperimentBasic.MapIndex_Tot_tilt);
+        end
     end
     
     %%%% To set tile FOV (microns)
@@ -111,7 +114,8 @@ for ss = 1:length(sliceid)
     ExperimentBasic.First_Tile = Scan.First_Tile;
     ExperimentBasic.MapIndex_Tot_offset = ExperimentBasic.MapIndex_Tot + ExperimentBasic.First_Tile -1;
     %%%% To set % overlap between tiles in x,y
-    ExperimentBasic.PercentOverlap = round((1-Scan.StepSize/Scan.NbPixels)*100);
+    % ExperimentBasic.PercentOverlap = round((1-Scan.StepSize/(Scan.FoV/10))*100);
+    ExperimentBasic.PercentOverlap = round((1-Scan.StepSize/Scan.FoV)*100);
     %%%% To calculate pixels size (microns)
     ExperimentBasic.PixSize = ExperimentBasic.FOV / ExperimentBasic.NbPix;
     
@@ -147,12 +151,38 @@ for ss = 1:length(sliceid)
 
     %%%% To run Mosaic with 50% overlap, call ExperimentBasic.*_Mean to get
     %%%%   the x and y pixel positions of each tile in the slice.
+
+    if strcmpi(Scan.TiltedIllumination,'Yes')
+        ExperimentBasic.FOV_tilt = Scan.FoV_tilt;  %in micron
+        ExperimentBasic.NbPix_tilt = Scan.NbPixels_tilt;
+        ExperimentBasic.First_Tile_tilt = Scan.First_Tile_tilt;
+        ExperimentBasic.MapIndex_Tot_offset_tilt = ExperimentBasic.MapIndex_Tot_tilt + ExperimentBasic.First_Tile_tilt -1;
+
+        ExperimentBasic.X_step_pix_tilt = ExperimentBasic.X_step_tilt / ExperimentBasic.PixSize;
+        ExperimentBasic.X_Tot_micron_tilt = ExperimentBasic.X_Tot_tilt;
+        ExperimentBasic.Y_Tot_micron_tilt = ExperimentBasic.Y_Tot_tilt;
+        ExperimentBasic.X_Tot_tilt = round(ExperimentBasic.X_Tot_micron_tilt / ExperimentBasic.PixSize);
+        ExperimentBasic.Y_Tot_tilt = round(ExperimentBasic.Y_Tot_micron_tilt / ExperimentBasic.PixSize);
+
+        ExperimentBasic.X_Tot_tilt = ExperimentBasic.X_Tot_tilt - min(ExperimentBasic.X_Tot_tilt(:)) + 1;
+        ExperimentBasic.Y_Tot_tilt = ExperimentBasic.Y_Tot_tilt - min(ExperimentBasic.Y_Tot_tilt(:)) + 1;
+        indexNaN = (ExperimentBasic.MapIndex_Tot_tilt==-1);
+        ExperimentBasic.X_Tot_tilt(indexNaN)=round(ExperimentBasic.X_Tot_tilt(indexNaN) - min(ExperimentBasic.X_Tot_tilt(:)) + 1);
+        ExperimentBasic.Y_Tot_tilt(indexNaN)=round(ExperimentBasic.Y_Tot_tilt(indexNaN) - min(ExperimentBasic.Y_Tot_tilt(:)) + 1);
+
+        ExperimentBasic.X_Mean_tilt = squeeze(median(ExperimentBasic.X_Tot_tilt,3));
+        ExperimentBasic.Y_Mean_tilt = squeeze(median(ExperimentBasic.Y_Tot_tilt,3));
+        ExperimentBasic.X_std_tilt = squeeze(std(ExperimentBasic.X_Tot_tilt,[],3));
+        ExperimentBasic.Y_std_tilt = squeeze(std(ExperimentBasic.Y_Tot_tilt,[],3));
+        %%%% To run Mosaic with 50% overlap, call ExperimentBasic.*_Mean to get
+        %%%%   the x and y pixel positions of each tile in the slice.
+    end
 end
 
 if ~isempty(ExpBasic)
     %%%% To save ExperimentBasic struct to .mat file
     fprintf(' - Writing ExperimentBasic struct to .mat file:\n %s\n',ExpBasic);
-    
+
     save(ExpBasic,'ExperimentBasic');
 end
 

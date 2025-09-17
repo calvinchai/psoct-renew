@@ -1,4 +1,16 @@
 function [] = do_stacking(ParameterFile, modality)
+% 
+% [] = do_stacking(ParameterFile, modality)
+%   stack and save specified 2D/en-face contrast into nifti volume
+% 
+% USAGE:
+% 
+%  INPUTS:          
+%       ParameterFile     =   Path to Parameters.mat file
+%                           - expects to load Parameters and Stack: 
+% 
+%   ~2024-03-06~  
+% 
 
 load(ParameterFile);
 
@@ -33,7 +45,7 @@ setappdata(f,'canceling',0);
 %% Stacking
 for i = 1:length(sliceid)
     
-    Imag = [indir filesep  modality '_slice' sprintf('%03i',i) '.mat'];
+    Imag = [indir filesep  modality '_slice' sprintf('%03i',sliceid(i)) '.mat'];
     load(Imag);
     S = whos('-file',Imag);
     I = eval(S.name);
@@ -52,32 +64,65 @@ for i = 1:length(sliceid)
     waitbar(step/steps,f,sprintf('Slice %i/ -%i- /%i',sliceid(1), sliceid(i), sliceid(end)))
 end
 stacknii = rot90(stacknii);
+
+
 %% Saving
 
-waitbar(step/steps,f,sprintf('Saving Stacked %s.nii', modality))
-
-name = [outdir filesep sprintf('Stacked_%s.nii', modality)];
-
 fprintf(' xy res=%g mm\n z  res=%g mm\n',resolution(1),resolution(3));
+waitbar(step/steps,f,sprintf('Saving Stacked_%s.nii.gz', modality))
 
+name = sprintf('%s/Stacked_%s.nii.gz', outdir, modality);
+write_mri(stacknii, name, resolution, 'float')
 
-disp(' - making hdr...');
-% Make Nifti and header
-colres = resolution(2); 
-rowres = resolution(1); 
-sliceres = resolution(3); 
-% mri.vol = I;
-mri.volres = [resolution(1) resolution(2) resolution(3)];
-mri.xsize = rowres;
-mri.ysize = colres;
-mri.zsize = sliceres;
-a = diag([-colres rowres sliceres 1]);
-
-mri.vox2ras0 = a;
-mri.volsize = size(stacknii);
-mri.vol = stacknii;
-% mri.vol = flip(mri.vol,1);
-MRIwrite(mri,name,'float');
-disp(' - END - ');
+if strcmp(modality,'Orientation')
+    stacknii = get_rgb_4D(stacknii, [-90, 90]); 
+    stacknii = stacknii*255;
+    name = sprintf('%s/Stacked_%s.RGB.nii.gz', outdir, modality);
+    write_mri(stacknii, name, resolution, 'int')
+end
 
 delete(f)
+
+end
+
+function I_rgb = get_rgb_4D(ori, range)
+r1 = range(1);
+r2 = range(2);
+
+sz = size(ori,[1,2,3]);
+ori = double(ori);
+ori(ori>r2)=ori(ori>r2)-180;
+ori(ori<r1)=ori(ori<r1)+180;
+ori = reshape(ori,sz(1),[]);
+
+I_hsv = mat2gray(ori,range);
+I_hsv(:,:,2:3) = 1;
+I_rgb=hsv2rgb(I_hsv);
+
+I_rgb = reshape (I_rgb,sz(1),sz(2),sz(3),3);
+
+end
+
+function write_mri(I, name, res, datatype)
+    if ~exist("datatype","var")
+        datatype = 'float';
+    end
+
+    disp(' - making hdr...');
+    % Make Nifti and header
+    colres = res(2); 
+    rowres = res(1); 
+    sliceres = res(3); 
+    % mri.vol = I;
+    mri.volres = [res(1) res(2) res(3)];
+    mri.xsize = rowres;
+    mri.ysize = colres;
+    mri.zsize = sliceres;
+    a = diag([-colres rowres sliceres 1]);
+    mri.vox2ras0 = a;
+    mri.volsize = size(I,[1,2,3]);
+    mri.vol = I;
+    % mri.vol = flip(mri.vol,1);
+    MRIwrite(mri,name,datatype);
+    disp(' - done - ');
+end

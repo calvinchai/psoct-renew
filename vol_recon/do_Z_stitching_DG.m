@@ -1,8 +1,6 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function do_Z_Stitching(ParameterFile)
 %% Stitching Z
 load(ParameterFile)
-
-%sliceidx=[1:24;1:24;[1:24]*0+1]
 
 sliceidx = Mosaic3D.sliceidx;
 modality = 'dBI';
@@ -12,30 +10,53 @@ z_s         = Mosaic3D.z_parameters(3);
 z_sms       = z_sm+z_s; 
 z_m         = z_sm-z_s;
 
+fprintf('zoff    skirt      mainbody    skirt\n')
+fprintf('%0.2i      %0.2i         %0.2i          %0.2i\n',zoff, z_s,z_m,z_s)
+fprintf('%0.2i + %0.2i = %0.2ipx (%ium) -> slice thickness\n',z_s,z_m,z_sm,z_sm*2.5)
+
 %zoff    skirt      mainbody    skirt
 %5       15         25          15
 
 %skirt + mainbody = slice thickness
 %15 + 25 = 40px (100um)
 
-load([Scan.ProcessDir '/dBI/dBI_slice003_mean-xy_20um-iso.mat'],'Id');%c
+load([Scan.ProcessDir filesep modality filesep modality '_slice003_mean_xy_20um_iso.mat'],'Id');%c
 
+if strcmpi(modality,'mus')
+    mus_aip = mean(smooth3(Id),3);
+    thresh = multithresh(mus_aip,2); % output will be [agar-gm gm-wm]
+    figure;subplot(1,2,1);imshow(mus_aip,[thresh(2),prctile(mus_aip(:),98)]); title('wm');
+    subplot(1,2,2);imshow(mus_aip,[thresh(1),thresh(2)]); title('gm');
+
+
+    wm_mask = mus_aip>thresh(2);    mask3d = logical(Id(1,1,:)*0 + wm_mask);
+    % gm_mask = mus_aip<thresh(2) & mus_aip>thresh(1);    mask3d = logical(Id(1,1,:)*0 + gm_mask);
+
+    tissue=mean(reshape(Id(mask3d),[],size(Id,3)), [1]);clear mask3d
+    tissue=tissue(:).';
+    figure; plot(tissue)
+elseif strcmpi(modality,'dBI')
+    % choose a tissue-only block to generate 3 weights
+    tissue=mean(Id(1:200,1:200,1+zoff:end), [1 2]);
+    tissue=tissue(:).';
+end
 % choose a tissue-only block to generate 3 weights
 %tissue=squeeze(mean(Id(100:100+300,600:600+300,1+zoff:end), [1 2])).'; %caa6 occi
-tissue=squeeze(mean(Id(850:850+190,1370:1370+400,1+zoff:end), [1 2])).'; %view3D(Id(250:250+300,870:600+300,1+zoff:end))
+% tissue=squeeze(mean(Id(850:850+190,1370:1370+400,1+zoff:end), [1 2])).'; %view3D(Id(250:250+300,870:600+300,1+zoff:end))
 
 % generate weights that uniform intensity level across depth
-s  = tissue(z_s)./tissue(1:z_s);        % Top Overlapping Skirt
-ms = tissue(z_s)./tissue(z_s+1:z_sms);  % Non-overlapping Body  &  Bottom Overlapping Skirt
+tissue = tissue([1:z_sms]+zoff);
+s  = tissue(z_s+1)./tissue(1:z_s);        % Top Overlapping Skirt
+ms = tissue(z_s+1)./tissue(z_s+1:z_sms);  % Non-overlapping Body  &  Bottom Overlapping Skirt
 
 % blending weight at the overlap
 switch modality
     case 'dBI'; degree = 1;   
-    case 'mus'; degree = 1.8; % 1  
+    case 'mus'; degree = 1; % 1  
 end
-w1 = s             .*linspace(0,1,z_s).^degree;     % Top Overlapping Skirt
-w2 = ms(z_m+1:end) .*linspace(1,0,z_s).^degree;     % Bottom Overlapping Skirt
-w3 = ms(1:z_m);  
+w1 = s             .*linspace(0,1,z_s).^degree; w1 = w1(:).';    % Top Overlapping Skirt
+w2 = ms(z_m+1:end) .*linspace(1,0,z_s).^degree; w2 = w2(:).';    % Bottom Overlapping Skirt
+w3 = ms(1:z_m);                                 w3 = w3(:).';
 
 
 nb_slices   = size(sliceidx,2);
@@ -63,13 +84,14 @@ fprintf(' - Output directory = \n%s\n',outdir);
     
 %%% loop slices
 for s = 1:size(sliceidx,2)
-
+    slice_in =sliceidx(1,s);
+    slice_out=sliceidx(2,s); % should be the same as s
     
     %kk_real = kk-first_slice+1; %kk+1;
     fprintf('\tslice %d\n',s);
 
     %%% load slice
-    fdata = [indir filesep modality '_slice' sprintf('%03i',s) '_mean-xy_20um-iso.mat'];
+    fdata = [indir filesep modality '_slice' sprintf('%03i',slice_in) '_mean-xy_20um-iso.mat'];
     load(fdata,'Id');
 
     %eval(['data' num2str(kk) '=data;']);

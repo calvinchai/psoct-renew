@@ -1,17 +1,12 @@
 function WriteMacro_Spiral( ParameterFile ) 
 
-% WriteMacro_Spiral( ParameterFile ) 
-%   create Fiji Macro script that initiate spiral stitching from set origin 
-%   for specified slices and modality. Agarose tile are excluded.
-% 
-% USAGE:
-% 
-%  INPUTS:          
-%       ParameterFile     =   Path to Parameters.mat file
-%                           - expects to load Parameters and WriteMacro: 
-% 
-%   ~2024-03-06~  
-% 
+% fdir = '/autofs/cluster/octdata2/users/Hui/SLF_I55/slab4/ProcessI55_slab4_x0z1_20210828/Stitching';
+% fmacro = 'Fiji_Stitching_Macro_clipped.ijm';
+% SliceInfo.sliceid = 90;
+% SliceInfo.modality = 'AIP';
+% SliceInfo.tiledir = '/autofs/cluster/octdata2/users/Hui/SLF_I55/slab4/ProcessI55_slab4_x0z1_20210828/Enface_Tiff_clipped';
+% load('/autofs/cluster/octdata2/users/Hui/SLF_I55/slab4/ProcessI55_slab4_x0z1_20210828/StitchingBasic/ExperimentBasic.mat');
+% Experiment = ExperimentBasic;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%% INITIAL SETTING 
@@ -68,7 +63,7 @@ for ssind=1:length(sliceid)
         fprintf(fid,l3);  
 
         
-        %spiral out
+        %spiral
         mapsz = size(MapIndex);
         
         grid_start = 50 - origin + 1;
@@ -79,9 +74,9 @@ for ssind=1:length(sliceid)
         B = B(grid_start(1):grid_end(1),...
             grid_start(2):grid_end(2));
 
-%         B = reshape(1:prod(mapsz),mapsz);
         
-        [~,id] = sort(B(:),'descend');
+          [~,id] = sort(B(:),'descend');
+%         [~,id] = sort(B(:),'ascend');
         for ii = 1:length(id)
             tilepad = sprintf('%03i', MapIndex(id(ii)));
             load([AgarInfoDir filesep tilepad '.mat'], 'tileinfo');
@@ -112,6 +107,3 @@ for ssind=1:length(sliceid)
 end
 
 fclose(fid_Macro);
-
-
-%% spiral / roll-by-roll / multiple small patches (get step & offset) / y strip first then x direction

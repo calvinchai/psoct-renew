@@ -1,11 +1,17 @@
 clear
-addpath('/space/megaera/1/users/kchai/code/psoct-renew/vol_recon');
+addpath('/local_mount/space/megaera/1/users/kchai/code/psoct-renew/vol_recon');
 
-t = tic;
+% t = tic;
 % next step sets path for parameter file put it in your processed directory
-ParameterFile  = ['/space/megaera/1/users/kchai/code/psoct-renew/Parameters.mat'];
+ParameterFile  = ['/local_mount/space/megaera/1/users/kchai/code/psoct-renew/Parameters.mat'];
 %P = whos('-file',ParameterFile);
-if exist(ParameterFile,'file'); warning(' --- ParameterFile already exists. Script is stopped to avoid overwriting. --- ');return; end
+if exist(ParameterFile,'file')
+    load(ParameterFile);
+    load(Parameters.ExpBasic);
+    load(Parameters.ExpFiji);
+    warning(' --- ParameterFile already exists. Script is stopped to avoid overwriting. --- ');
+    return; 
+end
 %% Aquisition Parameters 
 % This portion is mostly for record keeping
 Scan.SampleName          = 'I80 Premotor Slab';% name of your sample
@@ -44,7 +50,7 @@ Scan.System              = 'Telesto'; IsTelesto = strcmpi(Scan.System,'Telesto')
 Scan.Bath_Solution       = 'Mineraloil'; % what imaging medium was
 
 Scan.RawDataDir          = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/RawData';
-Scan.ProcessDir          = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/ProcessedData';
+Scan.ProcessDir          = '/local_mount/space/megaera/1/users/kchai/code/psoct-renew/process';
 Scan.TLSS_log            = 'TL_serial_shell_v31_20250509_092640_log.txt'; % used for creating ExperimentBasic
 Scan.ZStageConfig        = 'Stacked'; % either "Single" or "Stacked"
 Scan.First_Tile          = 1; 
@@ -145,7 +151,7 @@ load(ExpBasic);
 % Parameters.SliceID = [5:7]; % Mosaic 9, 10, 11, 12, 13, 14 (to run birefringence calculation)
 % Parameters.SliceID = [4:11]; % Mosaic 7 to 22 
 % Parameters.SliceID = [13:19]; % Mosaic 25 to 38 (to run stitching) - stopped at mosaic_030_image_400
-Parameters.SliceID = [5:11,13:26]; % Slices to try 3D stitching on (Kaidong)
+Parameters.SliceID = [5:5]; % Slices to try 3D stitching on (Kaidong)
 
 mosaic_nums = [];
 tile_nums = [];
@@ -162,8 +168,9 @@ else
     mosaic_nums = repelem(1:Parameters.SliceID(end),ExperimentBasic.TilesPerSlice);
     tile_nums = repmat(1:ExperimentBasic.TilesPerSlice,1,Parameters.SliceID(end));
 end
-Parameters.TileID  = tile_nums;
 Parameters.MosaicID = mosaic_nums;
+Parameters.TileID  = tile_nums;
+clear n mosaic_nums tile_nums tmp_mosaic_nums tmp_tile_nums
 
 Parameters.OrientationSign = 1;
 Parameters.OrienOffset     = 0;
@@ -188,7 +195,7 @@ save(ParameterFile,'Parameters','-append');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Process Raw Data
-if(1 == 1)
+if(0 == 1)
     if contains ('spectral',Scan.SaveMethod) % Process Spectral Raw data --> dBI3D, R3D, O3D, and 2D mat files
         istart = 165; % Starting Z-index for SurfaceFinding
 
@@ -222,22 +229,136 @@ Parameters.musGrayRange =   [0.7  3];
 
 save(ParameterFile,'Parameters','-append');
 
-%% Agarose thresholding (removing tiles with no tissue)
-Parameters.Agar.threshold_pct = 0.04;
-Parameters.Agar.threshold_std = 1.5; 
-Parameters.Agar.gm_aip = diff(Parameters.AipGrayRange)/4+Parameters.AipGrayRange(1);%(find thresh at mid-range intensity of graymatter which is roughly at lower half of AipGrayRange)
-Parameters.Agar.dir    = MapIndex;
+%% Agarose thresholding based on std (removing tiles with no tissue)
+
+% Implement std check for first 1000 tiles. Determine threshold to
+% separate agarose tiles from tissue tiles. Use Caroline's WriteMacro that
+% operates based on file location
+
+inspect_slice_num = 10;
+modality = 'aip';
+
+mosaic_num_normal = inspect_slice_num*2 - 1;
+mosaic_num_tilted = inspect_slice_num*2;
+
+std_slice = cell(2,1);
+for n_tilt = 1:2
+    switch n_tilt
+        case 1
+            title_string = 'Normal Illumination';
+            idx = find(Parameters.MosaicID == mosaic_num_normal);
+            idx_normal = idx';
+        case 2
+            title_string = 'Tilted Illumination';
+            idx = find(Parameters.MosaicID == mosaic_num_tilted);
+            idx_tilted = idx';
+    end
+    std_tmp = zeros(numel(idx),1);
+    for n = 1:numel(idx)
+        filename = replace(sprintf(Enface.input_format,Parameters.MosaicID(1,idx(n)),Parameters.TileID(1,idx(n))),'[modality]',modality);
+        tmp_modality = niftiread(fullfile(Enface.indir,filename));
+        std_tmp(n,1) = std2(tmp_modality);
+    end
+    std_slice{n_tilt,1} = std_tmp;
+    figure(n_tilt);
+    histogram(std_slice{n_tilt,1},'BinWidth',0.05);
+    title(title_string);
+end
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Look at aip std tiles in intermediate range
+low_range = 1.05; % 0.25;
+high_range = 1.15; % 0.3; 
+
+idx_normal_range = find(std_slice{1,1} > low_range & std_slice{1,1} < high_range);
+idx_tilted_range = find(std_slice{2,1} > low_range & std_slice{2,1} < high_range);
+
+% for i = 1:length(idx_normal_range)
+% for i = 2
+%     filename = replace(sprintf(Enface.input_format,Parameters.MosaicID(1,idx_normal(idx_normal_range(i,1))),Parameters.TileID(1,idx_normal(idx_normal_range(i,1)))),'[modality]',modality);
+%     tmp_modality = niftiread(fullfile(Enface.indir,filename));
+%     figure(5);
+%     imagesc(tmp_modality);
+%     colorbar;
+%     title(sprintf('aip %d, std %d',idx_normal(i,1),std_slice{1,1}(idx_normal_range(i,1))));
+%     pause(2);
+% end
+% for i = 1:length(idx_tilted)
+for i = 5
+    filename = replace(sprintf(Enface.input_format,Parameters.MosaicID(1,idx_tilted(idx_tilted_range(i,1))),Parameters.TileID(1,idx_tilted(idx_tilted_range(i,1)))),'[modality]',modality);
+    tmp_modality = niftiread(fullfile(Enface.indir,filename));
+    figure(5);
+    imagesc(tmp_modality);
+    colorbar;
+    title(sprintf('aip %d, std %d',idx_tilted(i,1),std_slice{2,1}(idx_tilted_range(i,1))));
+    pause(2);
+end
+
+% clear n n_tilt title_string std_tmp filename tmp_modality
+%% Sample aip tiles to look at thresholding
+mask_val = 56;
+stitch_path = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/ProcessedData/StitchingFiji';
+
+for inspect_slice_num = Parameters.SliceID
+    slice_string = sprintf('Slice %d',inspect_slice_num);
+    aip_normal = load([stitch_path,sprintf('/AIP_slice%03i.mat',inspect_slice_num)]);
+    aip_normal = aip_normal.MosaicFinal;
+    aip_tilted = load([stitch_path,sprintf('/AIP_tilt_slice%03i.mat',inspect_slice_num)]);
+    aip_tilted = aip_tilted.MosaicFinal;
+    aip_normal_masked = aip_normal;
+    aip_normal_masked(aip_normal_masked < mask_val) = 0;
+    aip_tilted_masked = aip_tilted;
+    aip_tilted_masked(aip_tilted_masked < mask_val) = 0;
+
+
+    fig1 = figure(6);
+    subplot(1,2,1);
+    imagesc(aip_normal);
+    title([slice_string,' AIP normal']);
+    subplot(1,2,2);
+    imagesc(aip_normal_masked);
+    title([slice_string,' AIP normal masked']);
+    colorbar;
+    fig1.Position = [1,551,1500,400];
+
+    fig2 = figure(7);
+    subplot(1,2,1);
+    imagesc(aip_tilted);
+    title([slice_string,' AIP tilted']);
+    subplot(1,2,2);
+    imagesc(aip_tilted_masked);
+    title([slice_string,' AIP tilted masked']);
+    colorbar;
+    fig2.Position = [1,1,1500,400];
+    pause(5);
+end
+
+
+%% Set Agar info
+
+% Parameters.Agar.threshold_pct = 0.04;
+% Parameters.Agar.threshold_std = 1.5; 
+% Parameters.Agar.gm_aip = diff(Parameters.AipGrayRange)/4+Parameters.AipGrayRange(1);%(find thresh at mid-range intensity of graymatter which is roughly at lower half of AipGrayRange)
+
+Parameters.Agar.aip_threshold = 56;
+
+
+Parameters.Agar.dir = MapIndex;
 Parameters.Agar.file_format = 'agar_status_mosaic_%03i_image_%04i.mat';
 save(ParameterFile,'Parameters','-append');
 
-% use std on mat2gray(I,aipgrayscale) may yeild a more distinct result, std
-% thresh may have variation then
-%[ agar_status ] = view_tile_aip( ParameterFile, [7 5] );
+% % use std on mat2gray(I,aipgrayscale) may yeild a more distinct result, std thresh may have variation then
+% [ agar_status ] = view_tile_aip( ParameterFile, [7 5] );
 
 
 %% WriteMacro & Read Registered Coordinates
 WriteMacro.Modality    = 'aip'; 
-WriteMacro.SpiralOrigin= round([ExperimentBasic.X_tile,ExperimentBasic.Y_tile]/2);
+
+if(strcmpi(Scan.TiltedIllumination,'Yes') == 1)
+    WriteMacro.SpiralOrigin = round([ExperimentBasic.X_tile_tilt,ExperimentBasic.Y_tile_tilt]/2);
+end
+WriteMacro.SpiralOrigin = round([ExperimentBasic.X_tile,ExperimentBasic.Y_tile]/2);
 
 WriteMacro.SliceID     = Parameters.SliceID;
 WriteMacro.TileDir     = Enface_Fiji;
@@ -249,7 +370,7 @@ end
 WriteMacro.AgarInfoDir = MapIndex;
 save(ParameterFile,'WriteMacro','-append'); % FijiStep
 
-ReadCoord.Method       = 1;     %select a method. 1=median; 2=step&offset
+ReadCoord.Method       = 2;     %select a method. 1=median; 2=step&offset
 % ReadCoord.ReadSliceID  = Parameters.SliceID;
 ReadCoord.ReadSliceID  = [6,7,9,10,11]; % Slices to use for normal stitching coordinates
 if(strcmpi(Scan.TiltedIllumination,'Yes') == 1)
@@ -335,7 +456,7 @@ fprintf('Elapsed time for stitching slices is %i minutes\n',round(elapsed_time/6
 %%%% (stored as Experiment_Fiji.X_Mean & .Y_Mean)
 
 saveflag = 1;
-[ Experiment_Fiji ] = ReadFijiTileCoordinates( ParameterFile, saveflag);
+[ Experiment_Fiji ] = ReadFijiTileCoordinates_NB( ParameterFile, saveflag);
 % Note: Had to comment out Method 2 saving in ReadFijiTileCoordinates
 % because of an error (?) with the Brainstem I58 data
 save(ParameterFile,'Experiment_Fiji','-append');
@@ -358,10 +479,11 @@ Mosaic2D.imresize   = 0;
 
 Mosaic2D.InFileType = 'nifti';    
 Mosaic2D.file_format= Enface.input_format;                                            % 'nifti' 'mat'
-Mosaic2D.indir      = {Enface.indir};                                       % {Enface_MAT}
+% Mosaic2D.indir      = {Enface.indir};   
+Mosaic2D.indir      = {'/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/RawData'};   
 Mosaic2D.outdir     = StitchingFiji;
 Mosaic2D.Exp        = ExpFiji;
-
+    
 save(ParameterFile,'Mosaic2D','-append');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

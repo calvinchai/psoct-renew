@@ -1,4 +1,18 @@
 function [Id] = do_downsample(I, ds_xyz, method)
+% 
+% I = do_downsample(I,ds_xyz,method)
+%   downsample I
+% 
+% USAGE:
+% 
+%  INPUTS:          
+%       I           =   3D volume
+%       ds_xyz      =   downsample factor for x y z
+%       method      =   downsample method (mean, min, max, median)
+% 
+%   ~2024-03-06~  
+% 
+
 if nargin == 2; method = 'mean'; end
 
 ds_x=ds_xyz(1);
@@ -30,16 +44,18 @@ d3                = permute(d3, [2,3,1]);
 
 lnr_box_mold        = sub2ind(sz,d1,d2,d3);
                     lnr_box_mold = lnr_box_mold(:).'; 
-
+clearvars -except I lnr_box lnr_anchor lnr_box_mold method sz_lnr_anchor
 lnr_box             = lnr_anchor - 1 + lnr_box_mold;
 sz_lnr_box          = size(lnr_box);
-
 switch method
     case 'mean'
+        clearvars -except I lnr_box sz_lnr_box sz_lnr_anchor
         Id = reshape(mean(reshape(I(lnr_box),sz_lnr_box),2),sz_lnr_anchor);
     case 'min'
         Id = reshape(min(reshape(I(lnr_box),sz_lnr_box),[],2),sz_lnr_anchor);
     case 'max'
         Id = reshape(max(reshape(I(lnr_box),sz_lnr_box),[],2),sz_lnr_anchor);
+    case 'median'
+        Id = reshape(median(reshape(I(lnr_box),sz_lnr_box),2),sz_lnr_anchor);
 end
 end
