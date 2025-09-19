@@ -1,15 +1,15 @@
 clear
-addpath('/space/megaera/1/users/kchai/code/psoct-renew/vol_recon');
+addpath('/space/megaera/1/users/kchai/code/psoct-renew/vol_recon_test2');
 
 t = tic;
 % next step sets path for parameter file put it in your processed directory
-ParameterFile  = ['/space/megaera/1/users/kchai/code/psoct-renew/Parameters.mat'];
+ParameterFile  = ['/space/megaera/1/users/kchai/code/psoct-renew/vol_recon_test2/Parameters.mat'];
 %P = whos('-file',ParameterFile);
 if exist(ParameterFile,'file'); warning(' --- ParameterFile already exists. Script is stopped to avoid overwriting. --- ');return; end
 %% Aquisition Parameters 
 % This portion is mostly for record keeping
-Scan.SampleName          = 'I80 Premotor Slab';% name of your sample
-Scan.Date                = '05_13_2025';% date of acquisition
+Scan.SampleName          = 'test_scan';% name of your sample
+Scan.Date                = '09_19_2025';% date of acquisition
 Scan.OCTOperator         = 'Chris';% who acquired the data
 Scan.PostProcessOperator = 'Nate';% who is processing the data
 Scan.ImagingNotes        = 'I80 human hemi slab with premotor cortex';% put any additional notes
@@ -22,44 +22,46 @@ if contains('spectral',Scan.SaveMethod)
     Scan.FileNameFormat  = 'mosaic_%03i_image_%04i_x_%06i_y_%06i_z_%06i_r_%06i_normal_spectral_%04i.nii'; % Only used as a template, do not need 'tilted variant'
     Scan.CropMethod      = 'none'; % either "none", "surface", or "focus"
 elseif contains('surfacefinding',Scan.SaveMethod)
-    % Scan.FilePrefix      = {'test_processed_'};
-    % Scan.FileNameFormat  = {'unused'};
-    % Scan.CropMethod      = 'surface'; % either "none", "surface", or "focus"
+    Scan.FilePrefix      = {'test_processed_'};
+    Scan.FileNameFormat  = {'surfacefinding'};
+    Scan.CropMethod      = 'surface'; % either "none", "surface", or "focus"
 elseif contains('complex',Scan.SaveMethod)
-    Scan.FilePrefix      = {'cropped_focus'}; % Strings used for [modality]
-    Scan.FileNameFormat  = 'mosaic_%03i_image_%04i_processed_[modality].nii'; % Only used as a template, do not need 'tilted variant'
-    Scan.CropMethod      = 'focus'; % either "none", "surface", or "focus"
+    Scan.FilePrefix      = {'cropped'}; % Strings used for [modality]
+    Scan.FileNameFormat  = 'mosaic_%03i_image_%03i_processed_[modality].nii'; % Only used as a template, do not need 'tilted variant'
+    Scan.CropMethod      = 'surface'; % either "none", "surface", or "focus"
 end
 if(strcmpi(Scan.CropMethod,'focus') == 1)
     Scan.Focus_CropStart = 150; % Starting cropping 150 pixels in Z above the 2D focus map
     % Scan.FocusFile = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/Focus/focus_mosaic1thru7.nii';
-    Scan.FocusFile = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/Focus/focus_mosaic9plus.nii';
+    % Scan.FocusFile = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/Focus/focus_mosaic9plus.nii';
+    Scan.FocusFile = '';
     if(strcmpi(Scan.TiltedIllumination,'Yes') == 1)
         % Scan.FocusFile_tilt = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/Focus/focus_mosaic2thru8.nii';
-        Scan.FocusFile_tilt = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/Focus/focus_mosaic10plus.nii';
+        % Scan.FocusFile_tilt = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/Focus/focus_mosaic10plus.nii';
+        Scan.FocusFile_tilt = '';
     end
 end
 Scan.Objective           = '10x'; % what objective was used, this is normally 10x
 Scan.System              = 'Telesto'; IsTelesto = strcmpi(Scan.System,'Telesto');% 
 Scan.Bath_Solution       = 'Mineraloil'; % what imaging medium was
 
-Scan.RawDataDir          = '/space/megaera/2/users/kchai/000052/tile_data/';
-Scan.ProcessDir          = '/space/megaera/1/users/kchai/code/psoct-renew/process/';
-Scan.TLSS_log            = 'TL_serial_shell_v31_20250509_092640_log.txt'; % used for creating ExperimentBasic
+Scan.RawDataDir          = '/space/megaera/1/users/kchai/code/psoct-renew/vol_recon_test2/rawdata/';
+Scan.ProcessDir          = '/space/megaera/1/users/kchai/code/psoct-renew/vol_recon_test2/process/';
+Scan.TLSS_log            = 'TL_serial_shell_v31_20250919_152814_log.txt'; % used for creating ExperimentBasic
 Scan.ZStageConfig        = 'Stacked'; % either "Single" or "Stacked"
 Scan.First_Tile          = 1; 
 
 Scan.Thickness           = 500;   % um  How thick sections were
-Scan.FoV                 = 3500;  % um  Get this from the acquisition software
-Scan.NbPixels            = 350;   % pix  Get this from the acquisition software
-Scan.StepSize            = 2800;   % um  Get this from the log file
+Scan.FoV                 = 2000;  % um  Get this from the acquisition software
+Scan.NbPixels            = 200;   % pix  Get this from the acquisition software
+Scan.StepSize            = 1600;   % um  Get this from the log file
 if strcmpi(Scan.TiltedIllumination,'Yes')
-    Scan.FoV_tilt             = 2000;  % um  Along shorter (X) axis, confined by physical tilting geometry
-    Scan.NbPixels_tilt        = 200;   % pix  Along shorter (X) axis
-    Scan.StepSize_tilt        = 1600;   % pix  Along shorter (X) axis
+    Scan.FoV_tilt             = 3500;  % um  Along shorter (X) axis, confined by physical tilting geometry
+    Scan.NbPixels_tilt        = 350;   % pix  Along shorter (X) axis
+    Scan.StepSize_tilt        = 2800;   % pix  Along shorter (X) axis
     Scan.First_Tile_tilt      = 1;
 end
-Scan.CropDepth           = 500;   % pix  size(niftiread([Scan.RawDataDir '/test_processed_001_cropped.nii']));
+Scan.CropDepth           = 200;   % pix  size(niftiread([Scan.RawDataDir '/test_processed_001_cropped.nii']));
                                   % if processing spectral this is just how
                                   % much of the dBI volume you saved when
                                   % cropping
@@ -93,7 +95,7 @@ ExpFiji         = [ProcDir '/Experiment_Fiji.mat'];
 Processed3D.indir         = RawDataDir; % Spectral or Complex files
 Processed3D.input_format  = Scan.FileNameFormat; % Spectral or Complex file format
 Processed3D.outdir        = Proc3D;
-Processed3D.output_format = 'mosaic_%03i_image_%04i_processed_[modality].nii'; % '[modality]_mosaic_%03i_image_%04i.nii';
+Processed3D.output_format = 'mosaic_%03i_image_%03i_processed_[modality].nii'; % '[modality]_mosaic_%03i_image_%04i.nii';
 Processed3D.outputstr     = {'dBI3D','R3D','O3D','biref'};%,'mus','dBI_crop','R3D_crop','O3D_crop'}; % Strings used for [modality]
 Processed3D.save          = Processed3D.outputstr([4]); % ([1,2,3,4]);
 Processed3D.dispComp      = '/autofs/cluster/octdata2/users/Hui/tools/dg_utils/spectralprocess/dispComp/mineraloil_LSM03/dispersion_compensation_LSM03_mineraloil_20240829/LSM03_mineral_oil_placecorrectionmeanall2.dat';
@@ -142,7 +144,7 @@ if ~exist(ExpBasic,'file')
 end
 load(ExpBasic);
 
-Parameters.SliceID = [10]; % Slices to try 3D stitching on (Kaidong)
+Parameters.SliceID = [1]; % Slices to try 3D stitching on (Kaidong)
 
 mosaic_nums = [];
 tile_nums = [];

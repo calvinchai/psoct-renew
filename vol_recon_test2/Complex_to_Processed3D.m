@@ -13,7 +13,8 @@ Output_Path_3D = Processed3D.outdir;
 Output_Files_3D = Processed3D.save;
 Output_Format_3D = Processed3D.output_format;
 
-Output_Path_2D = Enface.indir;
+% Output_Path_2D = Enface.indir;
+Output_Path_2D = '/local_mount/space/megaera/1/users/kchai/code/psoct-renew/vol_recon_test2/process/2d'
 Output_Files_2D = Enface.save;
 % Output_Format_2D = Enface.input_format;
 if(strcmpi(Scan.CropMethod,'focus') == 1)
