@@ -4,12 +4,12 @@ addpath('/autofs/cluster/octdata2/users/Chao/code/telesto');
 addpath ('/space/omega/1/users/3d_axis/PAPER/scripts');
 parpool_num = 10;
 
-basename1 = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/ProcessedData/Preliminary_stitching_noComputeOverlap/';
-basename2 = '/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/ProcessedData/Preliminary_stitching_noComputeOverlap/';
-slice_numbers = [8];
+basename1 = '/homes/5/kc1708/project/I80/';
+basename2 = '/homes/5/kc1708/project/I80/';
+slice_numbers = [10];
 
 disp('start parpool');
-poolobj = parpool(parpool_num);
+% poolobj = parpool(parpool_num);
 disp('parpool started');
 
 for slice = slice_numbers
@@ -17,11 +17,11 @@ for slice = slice_numbers
     slice_id1 = slice*2-1;
     slice_id2 = slice*2;
     
-    fixed1 = imread([basename1, 'mosaic_',sprintf('%03d',slice_id1),'_ori_stokes.tiff']); % orientation fixed
-    moving1 = imread([basename2, 'mosaic_',sprintf('%03d',slice_id2),'_ori_stokes.tiff']);  % orientation moving
+    fixed1 = imread([basename1, 'mosaic_',sprintf('%03d',slice_id1),'_ori.tif']); % orientation fixed
+    moving1 = imread([basename2, 'mosaic_',sprintf('%03d',slice_id2),'_ori.tif']);  % orientation moving
 
-    fixed2 = imread([basename1,'mosaic_',sprintf('%03d',slice_id1),'_biref_0_120.tiff']);
-    moving2 = imread([basename2, 'mosaic_',sprintf('%03d',slice_id2),'_biref_0_120.tiff']);
+    fixed2 = imread([basename1,'mosaic_',sprintf('%03d',slice_id1),'_biref.tif']);
+    moving2 = imread([basename2, 'mosaic_',sprintf('%03d',slice_id2),'_biref.tif']);
 
     fixed2 = imgaussfilt(fixed2,3);
     moving2 = imgaussfilt(moving2,3);
@@ -60,7 +60,7 @@ for slice = slice_numbers
     thruplane_reg_optiz_tensor_XY_final_par_JW (fixed_bi1,moving_bi1, fixed_o1, moving_o1, -10, ['par_slice' num2str(slice)],parpool_num)
 
 clear fixed_bi1 moving_bi1 fixed_o1 moving_o1
-delete(poolobj)
+% delete(poolobj)
 end
 
 % rest is done in thruplane_reg_optiz_tensor_XY_final_par_JW

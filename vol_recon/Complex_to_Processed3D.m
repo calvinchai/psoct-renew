@@ -43,6 +43,10 @@ tile_nums = Parameters.TileID;
 for i = 1:length(mosaic_nums)
 % for i = 980
     fprintf('Mosaic #%i, Tile #%i\n',mosaic_nums(i),tile_nums(i));
+
+    if (tile_nums(i)<1000) 
+        continue; 
+    end
     if(strcmpi(Scan.TiltedIllumination,'Yes') == 1)
         if(mod(mosaic_nums(i),2) == 1) % Odd mosaic nums --> Normal incidence
             num_x_px = Scan.NbPixels;
