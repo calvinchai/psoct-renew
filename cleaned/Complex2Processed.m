@@ -1,5 +1,5 @@
 
-function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori, biref, O3D, R3D, dBI3D, oriNew, birefNew, varargin)
+function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori, biref, O3D, R3D, dBI3D, oriMethod, birefMethod, unwrap,varargin)
 % Complex2Processed
 % Compute 3D metrics (dBI3D, R3D, O3D) and optional enface 2D maps (AIP, MIP, RET, ORI),
 % plus optional birefringence from a single complex PS-OCT NIfTI volume.
@@ -40,8 +40,9 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
         O3D string = ""
         R3D string = ""
         dBI3D string = ""
-        oriNew string = ""
-        birefNew string = ""
+        oriMethod string = ""
+        birefMethod string = ""
+        unwrap (1,1) logical = false
     end
     arguments (Repeating)
         varargin
@@ -74,18 +75,17 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
 
     clear V J1r J1i J2r J2i
 
-    % -------- Core 3D metrics (flip along z to match your original code) --------
     IJones = abs(J1).^2 + abs(J2).^2;
-    dBI3D_vol = flip( 10*log10(max(IJones, eps('single'))), 3 );
+    dBI3D_vol =  flip(10*log10(max(IJones, eps('single'))),3);
 
-    R3D_vol  = flip( atan( abs(J1)./max(abs(J2), eps('single')) )/pi*180, 3 );
+    R3D_vol  = flip(atan( abs(J1)./max(abs(J2), eps('single')) )/pi*180,3);
 
     phase1 = angle(J1);
     phase2 = angle(J2);
     phi = (phase1 - phase2);                       % wrap to [-pi,pi]
     phi(phi >  pi) = phi(phi >  pi) - 2*pi;
     phi(phi < -pi) = phi(phi < -pi) + 2*pi;
-    O3D_vol = flip( (phi/(2*pi))*180, 3 );         % degrees, nominally [-90,90]
+    O3D_vol = flip((phi/(2*pi))*180,3);         % degrees, nominally [-90,90]
 
     % -------- Surface handling for enface & biref windows --------
     if strlength(surfaceFile) > 0
@@ -95,7 +95,7 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
         end
         surf = surf + 1;                           % convert to MATLAB 1-based indexing
     else
-        surf = ones(nx,ny,'single');               % "0" → index 1 in MATLAB
+        surf = ones(nx,ny,'single')*100;               % "0" → index 1 in MATLAB
     end
 
     % Clamp surfaces inside [1, nz]
@@ -108,7 +108,15 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
     writeIfPath(dBI3D, dBI3D_vol, infoIn);
     writeIfPath(R3D,   R3D_vol,   infoIn);
     writeIfPath(O3D,   O3D_vol,   infoIn);
-
+    if (unwrap)
+        [Q,U,V,norms] = stokes_from_ori_ret(O3D_vol, R3D_vol, [3,3,10]);
+        ORI = compute_volume_ori(Q, U, V, deg2rad(O3D_vol), dBI3D_vol, surf);
+        O3D_vol = rad2deg(ORI);
+        RET = deg2rad(R3D_vol);
+        RET = compute_ret_lines(V, RET, surf);
+        R3D_vol = rad2deg(RET);
+        % surf(:,:) = 1;
+    end 
     % -------- Enface 2D maps over [surf : surf+depth] --------
     
         % Pre-allocate slices per XY on demand
@@ -126,8 +134,15 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
         end
 
         if strlength(ori)>0
-            % oriMap = enfaceOrientation(O3D_vol, surf, stopIdx); % degrees in [0,180)
-            oriMap = orien_enface(O3D_vol,5);
+            
+            % if (unwrap)
+            %     stopIdx(:,:) = 100;
+            % end
+            if (oriMethod == "new")
+                oriMap = enfaceOrientation(O3D_vol, surf, stopIdx);
+            else
+                oriMap = orien_enface(O3D_vol,5);
+            end
             writeIfPath(ori, oriMap, shrinkHeader(infoIn));
         end
 
@@ -135,22 +150,16 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
             if ~(isscalar(zSize) && zSize>0)
                 error('zSize must be provided and > 0 (micrometers) to compute biref.');
             end
-            birefMap = fitBirefringence(R3D_vol, surf, stopIdx, zSize, lambda_um);
+
+            if (birefMethod == "new")
+                birefMap = fitBirefringenceNew(R3D_vol, dBI3D_vol, surf, stopIdx,zSize,  lambda_um);
+            else
+                birefMap = fitBirefringence(R3D_vol, surf, stopIdx, zSize, lambda_um);
+            end 
+            
             writeIfPath(biref, birefMap, shrinkHeader(infoIn));
         end
 
-        [Q,U,V,norms] = stokes_from_ori_ret(O3D_vol, R3D_vol, 3);
-        [ori_full, ori_0_60, ori_0_100, ori_0_140, ori_0_180] = ...
-            enface_orientation_stokes(O3D_vol, R3D_vol, Q, U, V, dBI3D_vol, surf, ...
-                              'StartOffset',10, 'MaxLen',180, ...
-                              'CopyBackN',20, 'LowRetGate',pi/8);
-        if strlength(oriNew)>0
-            writeIfPath(oriNew, single(ori_full), shrinkHeader(infoIn));
-        end
-        if strlength(birefNew)>0
-            birefMap = fitBirefringenceNew(R3D_vol, dBI3D_vol, surf, stopIdx,zSize,  lambda_um);
-            writeIfPath(birefNew, birefMap, shrinkHeader(infoIn));
-        end
     
 end
 
@@ -281,16 +290,15 @@ function oriMap = enfaceOrientation(O3D_deg, surf, stopIdx)
     nx = size(O3D_deg,1); ny = size(O3D_deg,2);
     oriMap = zeros(nx,ny,'single');
 
-    for x = 1:nx
-        for y = 1:ny
-            z1 = surf(x,y); z2 = stopIdx(x,y);
+    for i = 1:nx
+        for j = 1:ny
+            z1 = surf(i,j); z2 = stopIdx(i,j);
             if z2 < z1, z2 = z1; end
-            theta = squeeze(O3D_deg(x,y,z1:z2));          % degrees (can be [-90,90])
-            theta = mod(theta,180);                        % map into [0,180)
-            z = exp(1i*deg2rad(2*theta));
-            m = angle(mean(z,'omitnan'))/2;               % radians
-            if isnan(m), m = 0; end
-            oriMap(x,y) = mod(rad2deg(m),180);
+            theta = 2*deg2rad(squeeze(O3D_deg(i,j,z1:z2)));
+            x = cos(theta);
+            y = sin(theta);                     
+            mean_angle = atan2(sum(y), sum(x));
+            oriMap(i,j) = mean_angle / 2 / pi * 180;
         end
     end
 end
@@ -301,11 +309,12 @@ function birefMap = fitBirefringence(R3D_deg, surf, stopIdx, zSize_um, lambda_um
     % OPD (um) = (R/360)*lambda_um. Slope(OPD vs depth) ≈ Δn.
     nx = size(R3D_deg,1); ny = size(R3D_deg,2);
     birefMap = zeros(nx,ny,'single');
-
+    
     for x = 1:nx
         for y = 1:ny
             z1 = surf(x,y); z2 = stopIdx(x,y);
             if z2 < z1, z2 = z1; end
+            z1 = 1; z2 = 100;
             rp = single(squeeze(R3D_deg(x,y,z1:z2)));
             % Stop early if zeros (e.g., crop) appear
             zZeros = find(rp==0,1,'first');
@@ -412,234 +421,277 @@ U = U ./ norms;
 V = V ./ norms;
 end
 
-function [enface_full, enface_0_60, enface_0_100, enface_0_140, enface_0_180] = ...
-    enface_orientation_stokes(O3D_deg, R3D_deg, Q, U, V, inten, surf, varargin)
-%ENFACE_ORIENTATION_STOKES Unwrap ORI along z using Stokes cues, then circular-mean.
-%   Outputs are [ny,nx] to mirror your saved NIfTIs (transpose before writing if needed).
-%   Optional args:
-%     'StartOffset' (default 10) samples below surf to start if room exists
-%     'MaxLen'      (default 180) maximum depth samples considered
-%     'CopyBackN'   (default 20)  number of initial samples forced to original ORI
-%     'LowRetGate'  (default pi/8) threshold to bail to original ORI when local ret too small
 
-p = inputParser;
-addParameter(p,'StartOffset',10);
-addParameter(p,'MaxLen',180);
-addParameter(p,'CopyBackN',20);
-addParameter(p,'LowRetGate',pi/8);
-parse(p,varargin{:});
-startOff = p.Results.StartOffset;
-maxLen   = p.Results.MaxLen;
-copyN    = p.Results.CopyBackN;
-lowGate  = p.Results.LowRetGate;
-
-[nx,ny,nz] = size(O3D_deg);
-ORI = deg2rad(O3D_deg);
-RET = deg2rad(R3D_deg);
-
-% We'll accumulate per-(x,y) lines, unwrap, then mean
-enface_full  = zeros(ny,nx,'single');
-enface_0_60  = zeros(ny,nx,'single');
-enface_0_100 = zeros(ny,nx,'single');
-enface_0_140 = zeros(ny,nx,'single');
-enface_0_180 = zeros(ny,nx,'single');
-
-for y = 1:ny
-    % local slices for speed
-    ORI_xy = squeeze(ORI(:,y,:));   % [nx,nz]
-    RET_xy = squeeze(RET(:,y,:));
-    Q_xy   = squeeze(Q(:,y,:));
-    U_xy   = squeeze(U(:,y,:));
-    V_xy   = squeeze(V(:,y,:));
-    inten_xy = squeeze(inten(:,y,:));
-
-    % derive a local retardance from V for the gradient sign test
-    localRET_fromV = acos( max(min(V_xy,1),-1) ); % clamp and acos
-
-    for x = 1:nx
-        lineI = inten_xy(x,:).';
-        valid_len = sum(lineI > 0.01);
-        s = max(0, round(surf(x,y))); % 0-based
-
-        % choose start
-        if valid_len - s > startOff
-            starts_ = s + startOff;
-        else
-            starts_ = s;
-        end
-        if starts_ == 10, starts_ = 0; end
-        starts_ = max(0, starts_);
-
-        % compute end
-        ends_ = min(nz-1, starts_ + min(valid_len - starts_, maxLen) - 1);
-
-        if ends_ < starts_
-            % nothing usable
-            continue;
-        end
-
-        % segments (convert to 1-based for MATLAB indexing)
-seg = (starts_+1):(ends_+1);
-
-% Force everything to be column vectors
-ori_seg   = squeeze(ORI_xy(x, seg));   ori_seg   = ori_seg(:);
-q_seg     = squeeze(Q_xy(x,   seg));   q_seg     = q_seg(:);
-u_seg     = squeeze(U_xy(x,   seg));   u_seg     = u_seg(:);
-ret_local = squeeze(localRET_fromV(x, seg)); 
-ret_local = ret_local(:);              % <-- column
-
-% gradient of local retardance, pad one at end (vertical cat)
-grad_ret = [diff(ret_local); 0];       % <-- semicolon, not comma
-
-
-        % pick q-u or q+u based on dynamic range
-        if (max(q_seg - u_seg) - min(q_seg - u_seg)) > (max(q_seg + u_seg) - min(q_seg + u_seg))
-            pick = (q_seg - u_seg);
-        else
-            pick = (q_seg + u_seg);
-        end
-
-        % phase flip rule
-        ori_adj = ori_seg;
-        if mean(pick(grad_ret > 0), 'omitnan') > 0
-            idx = (pick < 0);
-            ori_adj(idx) = ori_adj(idx) + pi/2;
-            ori_adj(ori_adj >  pi/2) = ori_adj(ori_adj >  pi/2) - pi;
-        else
-            idx = (pick > 0);
-            ori_adj(idx) = ori_adj(idx) + pi/2;
-            ori_adj(ori_adj >  pi/2) = ori_adj(ori_adj >  pi/2) - pi;
-        end
-
-        % copy back the first N samples from original ORI
-        cbN = min(copyN, numel(ori_adj));
-        ori_adj(1:cbN) = ori_seg(1:cbN);
-
-        % bail out if local retardance is too small
-        if mean(ret_local - prctile(ret_local,1), 'omitnan') < lowGate
-            ori_adj = ori_seg;
-        end
-
-        % pack different windowed circular means
-        enface_full(y,x)  = circ180_mean_deg(ori_adj);
-        enface_0_60(y,x)  = circ180_mean_deg(ori_adj(1 : min(60,  numel(ori_adj))));
-        enface_0_100(y,x) = circ180_mean_deg(ori_adj(1 : min(100, numel(ori_adj))));
-        enface_0_140(y,x) = circ180_mean_deg(ori_adj(1 : min(140, numel(ori_adj))));
-        enface_0_180(y,x) = circ180_mean_deg(ori_adj(1 : min(180, numel(ori_adj))));
-    end
-end
-end
-
-function mdeg = circ180_mean_deg(theta_rad)
-% helper: circular mean with 180° periodicity (theta in radians)
-if isempty(theta_rad)
-    mdeg = single(0);
-    return;
-end
-ang = 2*theta_rad(:);
-c = cos(ang); s = sin(ang);
-mean_angle = atan2(sum(s,'omitnan'), sum(c,'omitnan')); % [-pi,pi]
-mdeg = single( (mean_angle/2) * (180/pi) );
-end
-
-function biref = biref_percentile_slope(V, RET_rad, surf, inten, zSize_um, lambda_mm, varargin)
-%BIREFF_PERCENTILE_SLOPE Robust Δn via percentile of linear-fit slopes.
-%   biref = biref_percentile_slope(V, RET_rad, surf, inten, zSize_um, lambda_um, ...
-%                                  'PreferV',true, 'BaseLen',40, 'Step',5, ...
-%                                  'MaxExtra',100, 'Percentile',80)
+function volume_ori = compute_volume_ori(Q, U, V, ORI, inten, surfaceIdx)
+% COMPUTE_VOLUME_ORI  Build a {ny x nx} cell array of orientation profiles.
 %
-%   Units:
-%     zSize_um     : axial pixel size [µm]
-%     lambda_um    : wavelength [µm]
-%   Δn is unitless (slope of OPD vs depth). OPD from retardance r (radians) is:
-%     OPD = (r / (2*pi)) * lambda  .  Slope(OPD vs depth) ≈ Δn
+%   volume_ori = COMPUTE_VOLUME_ORI(U, Q, V, ORI, inten, surfaceIdx)
+%
+%   Inputs
+%   ------
+%   U, Q, V : 3D arrays sized [nx, ny, nz]
+%       Stokes components (or related volumes). Only V is used for local
+%       retardance; Q, U are used for phase selection.
+%
+%   ORI : 3D array [nx, ny, nz]
+%       Reference orientation volume (used for initial segments and fallback).
+%
+%   inten : 3D array [nx, ny, nz]
+%       Intensity volume used to determine valid length per A-line.
+%
+%   surfaceIdx : 2D array [nx, ny]
+%       Surface index (per X,Y). NOTE: named surfaceIdx to avoid clashing
+%       with MATLAB's SURF() plotting function.
+%
+%   Output
+%   ------
+%   volume_ori : {ny x nx} cell
+%       Each cell contains a column vector of orientations for the [X,Y]
+%       A-line after phase-flip correction and boundary enforcement.
+%
+%   Notes
+%   -----
+%   - This function removes the unused 'inputori' and the 'volume_ori_ref'
+%     return. Behavior matches your original script.
+%   - Uses prctile (Statistics & ML Toolbox). If unavailable, replace with
+%     a simple percentile approximation.
+%
 
-p = inputParser;
-addParameter(p,'PreferV',true);
-addParameter(p,'BaseLen',40);
-addParameter(p,'Step',5);
-addParameter(p,'MaxExtra',100);
-addParameter(p,'Percentile',80);
-addParameter(p,'IntenThresh',0.01);
-parse(p,varargin{:});
-preferV   = p.Results.PreferV;
-baseLen   = p.Results.BaseLen;
-step      = p.Results.Step;
-maxExtra  = p.Results.MaxExtra;
-percP     = p.Results.Percentile;
-thI       = p.Results.IntenThresh;
-
-[nx,ny,nz] = size(V);
-biref = zeros(nx,ny,'single');
-depth_per_px_um = zSize_um;
-
-for i = 1:nx
-for j = 1:ny
-    remaining = sum(inten(i,j,:) > thI) - surf(i,j);
-    s0 = max(0, round(surf(i,j)));           % 0-based
-    if remaining <= 0
-        biref(i,j) = 0; continue;
+    % Validate inputs (light)
+    if ndims(U) ~= 3 || ~isequal(size(U), size(Q), size(V), size(ORI), size(inten))
+        error('U, Q, V, ORI, inten must be 3D arrays of identical size [nx, ny, nz].');
+    end
+    if ~isequal(size(surfaceIdx), size(U(:,:,1)))
+        error('surfaceIdx must be sized [nx, ny].');
     end
 
-    if remaining > (baseLen + maxExtra)
-        iter_len = maxExtra;
-        endind   = baseLen + iter_len;
-    elseif remaining > baseLen
-        iter_len = remaining - baseLen;
-        endind   = baseLen + iter_len;
-    else
-        iter_len = min(5, remaining);
-        endind   = remaining;
-    end
+    [nx, ny, nz] = size(U);
 
-    % clamp indices to [1..nz]
-    start_idx = min(nz, s0 + 1);              % convert to 1-based
-    end_idx   = min(nz, s0 + endind);
+    % Preallocate output; cell order is {Y, X} to match your comment
+    volume_ori = cell(ny, nx);   % [Y, X]
 
-    if end_idx <= start_idx, biref(i,j) = 0; continue; end
+    % Loop over Y (lays_a) and X (lays)
+    for lays_a = 1:ny
+        % Local retardance per X over Z for this Y
+        inputret = acos(squeeze(V(:, lays_a, :)));   % [X, Z]
 
-    Vseg = squeeze(V(i,j,start_idx:end_idx));
-    retV = 0.5 * acos( max(min(Vseg,1),-1) );   % radians in [0,pi/2]
+        for lays = 1:nx
+            inten_line = squeeze(inten(lays, lays_a, :));  % [Z, 1]
+            valid_len  = sum(inten_line > 0.01);
 
-    % choose which retardance line to use
-    retR = squeeze(RET_rad(i,j,start_idx:end_idx)); % radians
-    if preferV
-        % If V-based has *enough* modulation, use it; else fall back to RET
-        useV = mean(retV - prctile(retV,1), 'omitnan') >= (pi/8);
-        if (useV)
+            % Surface index for this (X,Y)
+            s = surfaceIdx(lays, lays_a);
 
-            ret_line = retV(:);
-        else
-            ret_line = retR(:);
+            % Start index heuristic
+            if (valid_len - s) > 10
+                starts_ = round(s + 10);
+            else
+                starts_ = round(s);
+            end
+
+            % Preserve original quirk: special-case 10 => 0 (then clamped to 1)
+            if starts_ == 10
+                starts_ = 0;
+            end
+
+            % Boundaries
+            starts_ = max(1, starts_);
+            seg_len = min(valid_len - starts_, 120);
+            ends_   = min(nz, starts_ + seg_len);
+
+            if ends_ < starts_
+                % Nothing valid; fall back to empty
+                volume_ori{lays_a, lays} = [];
+                continue;
+            end
+
+            % Extract slices
+            actual_ori = squeeze(ORI(lays, lays_a, starts_:ends_));   % column
+            q_seg      = squeeze(Q(lays, lays_a, starts_:ends_));
+            u_seg      = squeeze(U(lays, lays_a, starts_:ends_));
+
+            % Pick +/- based on dynamic range
+            if (max(q_seg - u_seg) - min(q_seg - u_seg)) > (max(q_seg + u_seg) - min(q_seg + u_seg))
+                pick_ = q_seg - u_seg;
+            else
+                pick_ = q_seg + u_seg;
+            end
+
+            % Local retardance and its (forward) gradient
+            localret     = squeeze(inputret(lays, starts_:ends_));    % [Zseg, 1]
+            localret     = localret(:);
+            gradients_ret = [diff(localret); 0];                      % pad 1 at end
+
+            % Phase flip logic
+            if mean(pick_(gradients_ret > 0), 'omitnan') > 0
+                idx = pick_ < 0;
+                actual_ori(idx) = actual_ori(idx) + pi/2;
+                over = actual_ori >  pi/2;
+                actual_ori(over) = actual_ori(over) - pi;
+            else
+                idx = pick_ > 0;
+                actual_ori(idx) = actual_ori(idx) + pi/2;
+                over = actual_ori >  pi/2;
+                actual_ori(over) = actual_ori(over) - pi;
+            end
+
+            % Enforce first 20 values from ORI
+            copy_len = min(20, ends_ - starts_ + 1);
+            actual_ori(1:copy_len) = squeeze(ORI(lays, lays_a, starts_:(starts_ + copy_len - 1)));
+
+            % Fallback if local retardance is low
+            % (using your original thresholding formula)
+            if mean(localret(:) - prctile(localret(:), 1)) / 2 < pi/6
+                actual_ori = squeeze(ORI(lays, lays_a, starts_:ends_));
+            end
+
+            % Store (note the {Y, X} order)
+            volume_ori{lays_a, lays} = actual_ori(:);
         end
-    else
-        ret_line = retR(:);
     end
+    A = volume_ori;
+    [ny, nx] = size(A);
 
-    % Construct a “built” cumulative retardance if needed (optional):
-    % Here we simply use ret_line as-is. Keep the placeholders in case you
-    % later want to reproduce your accumulative trick exactly.
+% Find maximum length across all cells
+maxLen = max(max(cellfun(@(c) size(c,1), A)));
 
-    slopes = [];
-    for add = 0:step:(iter_len-1)
-        takeN = min(baseLen + add, numel(ret_line));
-        y = (ret_line(1:takeN) / (2*pi)) * lambda_mm;        % OPD [µm]
-        x = (0:(numel(y)-1))' * depth_per_px_um;             % depth [µm]
-        % robust linear fit (ordinary LS here; replace with robustfit if you want)
-        xmean = mean(x); ymean = mean(y);
-        denom = sum( (x - xmean).^2 );
-        if denom <= 0, continue; end
-        slope = sum( (x - xmean).*(y - ymean) ) / denom;     % Δn (unitless)
-        slopes(end+1) = abs(slope);
-    end
+% Preallocate numeric array with padding (NaN here)
+M = nan(nx, ny, maxLen, 'single');
 
-    if ~isempty(slopes)
-        biref(i,j) = single( prctile(slopes, percP) );
-    else
-        biref(i,j) = 0;
+% Fill in values
+for i = 1:nx
+    for j = 1:ny
+        v = A{j,i};
+        L = length(v);
+        M(i,j,1:L) = v;   % pad the rest with NaN
     end
 end
+volume_ori = M;
 end
+
+
+
+function ret_cell = compute_ret_lines(V, RET, surfaceIdx, winLen, pctLow, thresh)
+% COMPUTE_RET_LINES  Build {ny x nx} cell of retardance lines near a surface.
+%
+%   ret_cell = COMPUTE_RET_LINES(V, RET, surfaceIdx, winLen, pctLow, thresh)
+%
+%   Inputs
+%   ------
+%   V          : [nx, ny, nz] volume
+%   RET        : [nx, ny, nz] reference/estimated retardance (same size)
+%   surfaceIdx : [nx, ny] start index per (x,y) A-line (1-based)
+%   winLen     : (optional) number of samples after the surface (default 100)
+%   pctLow     : (optional) percentile for low-end removal (default 1)
+%   thresh     : (optional) mean(ret_raw - prctile) threshold (default pi/8)
+%
+%   Output
+%   ------
+%   ret_cell   : {ny x nx}, each cell is a column vector ret_line
+%
+%   Notes
+%   -----
+%   - Clamps V to [-1, 1] before acos to avoid NaNs from tiny numeric drift.
+%   - If the computed end index < start, returns [] for that A-line.
+
+    if nargin < 4 || isempty(winLen), winLen = 100; end
+    if nargin < 5 || isempty(pctLow), pctLow = 1;   end
+    if nargin < 6 || isempty(thresh), thresh = pi/8; end
+
+    % Basic checks
+    if ~isequal(size(V), size(RET))
+        error('V and RET must have identical size [nx, ny, nz].');
+    end
+    [nx, ny, nz] = size(V);
+    if ~isequal(size(surfaceIdx), [nx, ny])
+        error('surfaceIdx must be [nx, ny].');
+    end
+
+    % Output (noting your original {Y, X} storage)
+    ret_cell = cell(ny, nx);
+
+    % Helper for safe acos
+    safe_acos = @(x) acos(max(-1, min(1, x)));
+
+    for i = 1:nx
+        for j = 1:ny
+            start_idx = round(surfaceIdx(i, j));
+            if ~isfinite(start_idx)
+                ret_cell{j, i} = [];
+                continue;
+            end
+
+            % Boundaries
+            start_idx = max(1, min(nz, start_idx));
+            end_idx   = min(nz, start_idx + winLen);
+
+            if end_idx < start_idx
+                ret_cell{i, j} = [];
+                continue;
+            end
+
+            % Segments
+            Vseg   = squeeze(V(i, j, start_idx:end_idx));               % [Lx1]
+            retRaw = safe_acos(Vseg) / 2;
+
+            % Branch on low-variance criterion
+            if mean(retRaw - prctile(retRaw, pctLow), 'omitnan') < thresh
+                % Use RET directly (note the +1 shift like your original)
+                if start_idx + 1 <= end_idx
+                    ret_line = squeeze(RET(i, j, start_idx+1:end_idx));
+                else
+                    ret_line = []; % not enough samples
+                end
+            else
+                % Vectorized cumulative build
+                if start_idx + 1 <= end_idx
+                    Vseg1 = squeeze(V(i, j, start_idx+1:end_idx));
+                    Vseg0 = squeeze(V(i, j, start_idx:end_idx-1));
+                    diffs = abs((safe_acos(Vseg1) - safe_acos(Vseg0)) / 2);
+                    rstret = safe_acos(V(i, j, start_idx)) / 2;
+
+                    % ret_build = [rstret; rstret + cumsum(diffs)]
+                    ret_build = [rstret; rstret + cumsum(diffs(:))];
+
+                    % Align and blend like your original expression
+                    RETseg = squeeze(RET(i, j, start_idx:end_idx));
+                    ret_line = ret_build(:) + RETseg(:) - retRaw(:);
+                else
+                    % If the window is a single point, mirror the original behavior
+                    rstret  = safe_acos(V(i, j, start_idx)) / 2;
+                    RETseg  = squeeze(RET(i, j, start_idx));
+                    ret_line = rstret + RETseg - retRaw;
+                end
+            end
+
+            % Store as column vector
+            ret_cell{j, i} = ret_line(:);
+        end
+    end
+    A=ret_cell;
+    [ny, nx] = size(A);
+
+% Find maximum length across all cells
+maxLen = max(max(cellfun(@(c) size(c,1), A)));
+
+% Preallocate numeric array with padding (NaN here)
+M = nan(nx, ny, maxLen, 'single');
+
+% Fill in values
+for i = 1:nx
+    for j = 1:ny
+        v = A{j,i};
+        L = length(v);
+        M(i,j,1:L) = v;   % pad the rest with NaN
+    end
 end
+ret_cell = M;
+end
+
+
+
+
+
+
 
 

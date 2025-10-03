@@ -1,5 +1,6 @@
 % load(['/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/vol_recon_proj_JW_2025/par_' filetag '_data.mat'])
-
+function RGB_3Daxis(basename)
+load([basename 'par_slice1_data_0_100.mat'])
 alpha = pi/2-Psi_ObsLSQ;
 alpha(alpha>pi/2)=alpha(alpha>pi/2)-pi;
 alpha(alpha<-pi/2)=alpha(alpha<-pi/2)+pi;
@@ -12,4 +13,7 @@ I_B(I_B<0)=0;
 
 oct_vec_3d = cat(3, Y, Z, X);
 
-figure; imshow(abs(oct_vec_3d));
+% figure; imshow(abs(oct_vec_3d));
+imwrite(abs(oct_vec_3d), [basename '3daxis.jpg']);
+
+end

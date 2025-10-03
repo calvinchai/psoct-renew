@@ -1,21 +1,37 @@
-function batch_process_cc%(inDir, outDir)
+function batch_process_cc(inDir, outDir,depth, varargin)
 % Batch-process complex PS-OCT volumes to orientation & birefringence NIfTIs (parallel).
 
-inDir  = "/vast/fiber/projects/20250920_CCtest4_30degrees_CW/";
-outDir = "/local_mount/space/megaera/1/users/kchai/project/NewBiref_20250920_CCtest4_30degrees_CW/processed/";
+if nargin <4
+    oriMethod = "";
+else
+    oriMethod = varargin{1}; % "" or "new"
+end
+if nargin <5
+    birefMethod = "";
+else
+    birefMethod = varargin{2}; % "" or "new"
+end
+if nargin < 6
+    unwrap = false;
+else
+    unwrap = varargin{3}; % true or false
+end
 
-addpath('/local_mount/space/megaera/1/users/kchai/code/psoct_data_processing/vol_recon/');
+%inDir  = "/vast/fiber/projects/20250920_CCtest4_30degrees_CW/";
+%outDir = "/local_mount/space/megaera/1/users/kchai/project/NewBiref_20250920_CCtest4_30degrees_CW/processed/";
+
+addpath('/local_mount/space/megaera/1/users/kchai/code/psoct-data-processing/vol_recon/');
 % ---- Parameters ----
 surfaceFile = "";           % If you have per-volume surfaces, make this dynamic per file.
-depth       = 100;          % pixels below surface (depth_lin_ret)
-lambda_um   = 0.0013; 
+% depth       = 100;          % pixels below surface (depth_lin_ret)
+lambda_um   = 0.0013;
 zSize_um = 2.5;
 
 % ---- Prep ----
 if ~exist(outDir,"dir"), mkdir(outDir); end
 
 files = [ dir(fullfile(inDir, "mosaic_*_image_*_processed_cropped.nii")); ...
-          dir(fullfile(inDir, "mosaic_*_image_*_processed_cropped.nii.gz")) ];
+    dir(fullfile(inDir, "mosaic_*_image_*_processed_cropped.nii.gz")) ];
 
 if isempty(files)
     error("No input files found in %s", inDir);
@@ -68,27 +84,28 @@ fprintf("Processing %d files in parallel...\n", N);
 
 % ---- Parallel loop ----
 parfor k = 1:N
+% for k = 1:N
     inPath = inPaths(k);
-
+    % surfaceFile = replace(inPath,'cropped', 'surface_finding')
     % Only produce ori + biref; skip others by passing ""
     aip=""; mip=""; ret=""; O3D=""; R3D=""; dBI3D="";
     ori ="";
     biref = "";
     oriNew = "";
     birefNew = "";
-    % ori = outOri(k);
-    % biref = outBiref(k);
+    ori = outOri(k);
+    biref = outBiref(k);
     % dBI3D=outdBI(k);
     %oriNew = outOriNew(k);
     birefNew = outBirefNew(k);
     Complex2Processed( ...
         inPath, surfaceFile, depth, zSize_um, ...
         aip, mip, ret, ori, biref,...
-        O3D, R3D, dBI3D, oriNew, birefNew, ...
+        O3D, R3D, dBI3D, oriMethod, birefMethod, unwrap, ...
         "WavelengthUm", lambda_um);
 
     fprintf("[OK] %s\n", inPath);
-    
+
 end
 
 fprintf("Done. Outputs in: %s\n", outDir);
@@ -98,12 +115,12 @@ end
 
 function [ok, mosaicStr, imageStr] = parse_mosaic_image(base)
 % Expect base like "mosaic_002_image_064_processed_cropped"
-    ok = false; mosaicStr=""; imageStr="";
-    tokens = regexp(base, '^mosaic_(\d{3})_image_(\d{3})_processed_cropped$', 'tokens', 'once');
-    if ~isempty(tokens)
-        mosaicStr = string(tokens{1});
-        imageStr  = string(tokens{2});
-        ok = true;
-    end
+ok = false; mosaicStr=""; imageStr="";
+tokens = regexp(base, '^mosaic_(\d{3})_image_(\d{3})_processed_cropped$', 'tokens', 'once');
+if ~isempty(tokens)
+    mosaicStr = string(tokens{1});
+    imageStr  = string(tokens{2});
+    ok = true;
+end
 end
 

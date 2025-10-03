@@ -1,17 +1,19 @@
-clear;
+
+function thruplane(basename, gamma)
+%gamma = -10
+
 addpath ('/autofs/cluster/octdata2/users/Chao/code/demon_registration_version_8f');
 addpath('/autofs/cluster/octdata2/users/Chao/code/telesto');
 addpath ('/space/omega/1/users/3d_axis/PAPER/scripts');
-parpool_num = 10;
+parpool_num = 24;
 
-basename1 = '/homes/5/kc1708/project/I80/';
-basename2 = '/homes/5/kc1708/project/I80/';
-slice_numbers = [10];
+basename1 = basename;
+basename2 = basename1;
+slice_numbers = [1];
 
 disp('start parpool');
 % poolobj = parpool(parpool_num);
 disp('parpool started');
-
 for slice = slice_numbers
     % % read first set
     slice_id1 = slice*2-1;
@@ -30,24 +32,30 @@ for slice = slice_numbers
     f1_dims = size(fixed1);
     m1_dims = size(moving1);
 
-    f1_xrange1 = 1;             
-    f1_xrange2 = f1_dims(1)-39; 
+%     f1_xrange1 = 1;             
+%     f1_xrange2 = end; 
+% 
+%     f1_yrange1 = 1;                  
+%     f1_yrange2 = end; 
+% 
+% 
+%     m1_xrange1 = 1;          
+%     m1_xrange2 = end; 
+% 
+%     m1_yrange1 = 1;        
+%     m1_yrange2 = end; 
+% 
+%     fixed_o1 =  -fixed1(f1_xrange1:f1_xrange2,f1_yrange1:f1_yrange2);
+%     fixed_bi1 =  fixed2(f1_xrange1:f1_xrange2,f1_yrange1:f1_yrange2);
+% %
+%     moving_o1 = -moving1(m1_xrange1:m1_xrange2,m1_yrange1:m1_yrange2);
+%     moving_bi1 = moving2(m1_xrange1:m1_xrange2,m1_yrange1:m1_yrange2);
 
-    f1_yrange1 = 60;                  
-    f1_yrange2 = m1_dims(2)+59; 
-
-
-    m1_xrange1 = 40;          
-    m1_xrange2 = m1_dims(1); 
-
-    m1_yrange1 = 1;        
-    m1_yrange2 = m1_dims(2); 
-
-    fixed_o1 =  -fixed1(f1_xrange1:f1_xrange2,f1_yrange1:f1_yrange2);
-    fixed_bi1 =  fixed2(f1_xrange1:f1_xrange2,f1_yrange1:f1_yrange2);
+    fixed_o1 =  -fixed1;
+    fixed_bi1 =  fixed2;
 %
-    moving_o1 = -moving1(m1_xrange1:m1_xrange2,m1_yrange1:m1_yrange2);
-    moving_bi1 = moving2(m1_xrange1:m1_xrange2,m1_yrange1:m1_yrange2);
+    moving_o1 = -moving1;
+    moving_bi1 = moving2;
     %   figure, subplot(1,2,1);imagesc(fixed_bi1);subplot(1,2,2);imagesc(moving_bi1)
 
 %     fixed_o1 = imresize (fixed_o1, [size(fixed_bi1,1) size(fixed_bi1,2)],'nearest');
@@ -57,7 +65,7 @@ for slice = slice_numbers
 
 
 
-    thruplane_reg_optiz_tensor_XY_final_par_JW (fixed_bi1,moving_bi1, fixed_o1, moving_o1, -10, ['par_slice' num2str(slice)],parpool_num)
+    thruplane_reg_optiz_tensor_XY_final_par(fixed_bi1,moving_bi1, fixed_o1, moving_o1, gamma, [basename 'par_slice' num2str(slice)],parpool_num)
 
 clear fixed_bi1 moving_bi1 fixed_o1 moving_o1
 % delete(poolobj)
@@ -65,3 +73,4 @@ end
 
 % rest is done in thruplane_reg_optiz_tensor_XY_final_par_JW
 
+end

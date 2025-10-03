@@ -2,12 +2,12 @@
 function recalculate_biref_orientation_I80(mosaicnum)
 mosaicnum=str2num(mosaicnum);
 % Define file path
-file_path = '/vast/fiber/projects/20250920_CCtest4_30degrees_CW/';
-outdir = '/autofs/space/megaera_001/users/kchai/project/20250920_CCtest4_30degrees_CW_UpdatedBiref/processed/';
+file_path = '/autofs/cluster/connects2/users/CRC/20250919_CCtest/';
+outdir = '/autofs/space/megaera_001/users/kchai/project/EXP1-UnWrap/processed/';
 if mod(mosaicnum,2)==1
-    all_tissues = [1:13*5];
+    all_tissues = [1:6*5];
 else
-    all_tissues = [1:9*5];
+    all_tissues = [1:8*6];
 end
 
 % disp('start parpool');
@@ -60,13 +60,12 @@ parfor tilenum = all_tissues
     inten = 10 * log10( sqrt( abs(Jones1).^2 + abs(Jones2).^2 ) );
     
     % Flip intensity along Z-axis (3rd dimension)
-    inten = inten(:,:,end:-1:1);
+    % inten = inten(:,:,end:-1:1);
     
     % Shift non-Inf values upward
     inten = shift_non_inf_up(inten);
 
 
-    
     % Compute Q, U, V directly without allocating ORI2 or RET2
     Q = imgaussfilt3(sin(2 * ORI) .* sin(2 * RET), 3);
     U = imgaussfilt3(cos(2 * ORI) .* sin(2 * RET), 3);
@@ -475,9 +474,9 @@ parfor tilenum = all_tissues
 
 
     % Define file paths
-    real_name = fullfile(outdir, sprintf('mosaic_%03d_image_%04d_reprocessed_orientation.nii', mosaicnum, tilenum));
-    real_name_ref = fullfile(outdir, sprintf('mosaic_%03d_image_%04d_reprocessed_orientation_shallow.nii', mosaicnum, tilenum));
-    replace_name = fullfile(outdir, sprintf('mosaic_%03d_image_%04d_processed_orientation.nii', mosaicnum, tilenum));
+    real_name = fullfile(outdir, sprintf('mosaic_%03d_image_%03d_processed_ori.nii', mosaicnum, tilenum));
+    real_name_ref = fullfile(outdir, sprintf('mosaic_%03d_image_%03d_reprocessed_orientation_shallow.nii', mosaicnum, tilenum));
+    replace_name = fullfile(outdir, sprintf('mosaic_%03d_image_%03d_processed_orientation.nii', mosaicnum, tilenum));
 
     % If backup doesn't exist, rename the original
 
@@ -531,7 +530,7 @@ parfor tilenum = all_tissues
 
 
     % Define file paths
-    real_name = fullfile(outdir, sprintf('mosaic_%03d_image_%04d_reprocessed_biref.nii', mosaicnum, tilenum));
+    real_name = fullfile(outdir, sprintf('mosaic_%03d_image_%03d_processed_biref.nii', mosaicnum, tilenum));
     real_name_v = fullfile(outdir, sprintf('mosaic_%03d_image_%04d_reprocessed_biref_v.nii', mosaicnum, tilenum));
 
     replace_name = fullfile(outdir, sprintf('mosaic_%03d_image_%04d_processed_biref.nii', mosaicnum, tilenum));
