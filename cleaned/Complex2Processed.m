@@ -2,8 +2,7 @@
 function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori, biref, O3D, R3D, dBI3D, oriMethod, birefMethod, unwrap,varargin)
 % Complex2Processed
 % Compute 3D metrics (dBI3D, R3D, O3D) and optional enface 2D maps (AIP, MIP, RET, ORI),
-% plus optional birefringence from a single complex PS-OCT NIfTI volume.
-%
+% plus optional birefringence from a single complex PS-OCT NIfTI volume.    
 % INPUTS (use "" to skip any output you don't want):
 %   input        : string, path to input complex NIfTI. Layout: 4*X × Y × Z
 %                  where blocks along dim-1 are [J1_real; J1_imag; J2_real; J2_imag].
@@ -26,6 +25,9 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
 %
 % Example:
 % Complex2Processed("complex.nii.gz","surf.nii.gz",100,3.3,"aip.nii.gz","", "", "", "biref.nii.gz", "", "", "");
+
+ %% 10/05/25 CL ???
+    V = single(V);                       % enforce single precision downstream  
 
     arguments
         input string
@@ -56,8 +58,11 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
     % -------- Load input complex NIfTI --------
     infoIn = niftiinfo(input);
     V = niftiread(infoIn);               % single or double; dimensions: (4*X) × Y × Z
-    V = single(V);                       % enforce single precision downstream
-
+   
+    %%
+    V = single(V);                       % enforce single precision downstream  
+    %%
+    
     % Infer dimensions and split Jones components
     X4 = size(V,1);
     if mod(X4,4)~=0
@@ -294,7 +299,7 @@ function oriMap = enfaceOrientation(O3D_deg, surf, stopIdx)
         for j = 1:ny
             z1 = surf(i,j); z2 = stopIdx(i,j);
             if z2 < z1, z2 = z1; end
-            theta = 2*deg2rad(squeeze(O3D_deg(i,j,z1:z2)));
+            theta = 2*deg2rad(squeeze(O3D_deg(i,j,z1:z2))); % why multiplied by 2
             x = cos(theta);
             y = sin(theta);                     
             mean_angle = atan2(sum(y), sum(x));
@@ -308,7 +313,7 @@ function birefMap = fitBirefringence(R3D_deg, surf, stopIdx, zSize_um, lambda_um
     % R3D_deg is retardance in degrees; convert to cycles: R/360.
     % OPD (um) = (R/360)*lambda_um. Slope(OPD vs depth) ≈ Δn.
     nx = size(R3D_deg,1); ny = size(R3D_deg,2);
-    birefMap = zeros(nx,ny,'single');
+    birefMap = zeros(nx,ny,'single'); % single again
     
     for x = 1:nx
         for y = 1:ny
