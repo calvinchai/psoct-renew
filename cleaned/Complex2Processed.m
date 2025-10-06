@@ -27,7 +27,7 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
 % Complex2Processed("complex.nii.gz","surf.nii.gz",100,3.3,"aip.nii.gz","", "", "", "biref.nii.gz", "", "", "");
 
  %% 10/05/25 CL ???
-    V = single(V);                       % enforce single precision downstream  
+ %   V = single(V);                       % enforce single precision downstream  
 
     arguments
         input string
