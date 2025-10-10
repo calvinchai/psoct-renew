@@ -22,7 +22,7 @@ end
 
 addpath('/local_mount/space/megaera/1/users/kchai/code/psoct-data-processing/vol_recon/');
 % ---- Parameters ----
-surfaceFile = "";           % If you have per-volume surfaces, make this dynamic per file.
+          % If you have per-volume surfaces, make this dynamic per file.
 % depth       = 100;          % pixels below surface (depth_lin_ret)
 lambda_um   = 0.0013;
 zSize_um = 2.5;
@@ -30,8 +30,8 @@ zSize_um = 2.5;
 % ---- Prep ----
 if ~exist(outDir,"dir"), mkdir(outDir); end
 
-files = [ dir(fullfile(inDir, "mosaic_*_image_*_processed_cropped.nii")); ...
-    dir(fullfile(inDir, "mosaic_*_image_*_processed_cropped.nii.gz")) ];
+files = [ dir(fullfile(inDir, "mosaic_*_image_*_processed_cropped_focus.nii")); ...
+    dir(fullfile(inDir, "mosaic_*_image_*_processed_cropped_focus.nii.gz")) ];
 
 if isempty(files)
     error("No input files found in %s", inDir);
@@ -49,7 +49,7 @@ N = numel(files);
 inPaths   = strings(N,1);
 outOri    = strings(N,1);
 outBiref  = strings(N,1);
-
+surfaceFile = strings(N,1);
 for k = 1:N
     inPath = string(fullfile(files(k).folder, files(k).name));
     [~, base, ext] = fileparts(inPath);
@@ -66,7 +66,12 @@ for k = 1:N
     end
 
     inPaths(k)  = inPath;
-    outdBI(k)   = fullfile(outDir, sprintf("mosaic_%s_image_%s_processed_dbi.nii",   mosaicStr, imageStr));
+    % /autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/RawData/mosaic_019_image_0001_processed_surface_finding.nii
+    surfaceFile(k) = sprintf("/autofs/cluster/connects2/users/data/I80_premotor_slab_2025_05_13/RawData/mosaic_%s_image_%s_processed_surface_finding.nii", mosaicStr, imageStr);
+    outAIP(k) = fullfile(outDir, sprintf("mosaic_%s_image_%s_processed_aip.nii",   mosaicStr, imageStr));
+    outdBI(k)   = fullfile(outDir, sprintf("mosaic_%s_image_%s_processed_dBI.nii",   mosaicStr, imageStr));
+    outO3D(k)   = fullfile(outDir, sprintf("mosaic_%s_image_%s_processed_O3D.nii",   mosaicStr, imageStr));
+    outR3D(k)   = fullfile(outDir, sprintf("mosaic_%s_image_%s_processed_R3D.nii",   mosaicStr, imageStr));
     outOri(k)   = fullfile(outDir, sprintf("mosaic_%s_image_%s_processed_ori.nii",   mosaicStr, imageStr));
     outBiref(k) = fullfile(outDir, sprintf("mosaic_%s_image_%s_processed_biref.nii", mosaicStr, imageStr));
     outOriNew(k)   = fullfile(outDir, sprintf("mosaic_%s_image_%s_processed_oriNew.nii",   mosaicStr, imageStr));
@@ -83,12 +88,13 @@ N = numel(inPaths);
 fprintf("Processing %d files in parallel...\n", N);
 
 % ---- Parallel loop ----
-parfor k = 1:N
-% for k = 1:N
+% parfor k = 1:N
+parfor k = 1105:1115
+% for k = 200:201
     inPath = inPaths(k);
     % surfaceFile = replace(inPath,'cropped', 'surface_finding')
     % Only produce ori + biref; skip others by passing ""
-    aip=""; mip=""; ret=""; O3D=""; R3D=""; dBI3D="";
+    aip=outAIP(k); mip=""; ret=""; O3D=outO3D(k); R3D=outR3D(k); dBI3D=outdBI(k);
     ori ="";
     biref = "";
     oriNew = "";
@@ -99,7 +105,7 @@ parfor k = 1:N
     %oriNew = outOriNew(k);
     birefNew = outBirefNew(k);
     Complex2Processed( ...
-        inPath, surfaceFile, depth, zSize_um, ...
+        inPath, surfaceFile(k), depth, zSize_um, ...
         aip, mip, ret, ori, biref,...
         O3D, R3D, dBI3D, oriMethod, birefMethod, unwrap, ...
         "WavelengthUm", lambda_um);
@@ -116,7 +122,7 @@ end
 function [ok, mosaicStr, imageStr] = parse_mosaic_image(base)
 % Expect base like "mosaic_002_image_064_processed_cropped"
 ok = false; mosaicStr=""; imageStr="";
-tokens = regexp(base, '^mosaic_(\d{3})_image_(\d{3})_processed_cropped$', 'tokens', 'once');
+tokens = regexp(base, '^mosaic_(\d{3})_image_(\d{4})_processed_cropped_focus$', 'tokens', 'once');
 if ~isempty(tokens)
     mosaicStr = string(tokens{1});
     imageStr  = string(tokens{2});

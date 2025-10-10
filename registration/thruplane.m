@@ -9,7 +9,7 @@ parpool_num = 24;
 
 basename1 = basename;
 basename2 = basename1;
-slice_numbers = [1];
+slice_numbers = [10,11];
 
 disp('start parpool');
 % poolobj = parpool(parpool_num);
@@ -24,14 +24,29 @@ for slice = slice_numbers
 
     fixed2 = imread([basename1,'mosaic_',sprintf('%03d',slice_id1),'_biref.tif']);
     moving2 = imread([basename2, 'mosaic_',sprintf('%03d',slice_id2),'_biref.tif']);
-
+    
     fixed2 = imgaussfilt(fixed2,3);
     moving2 = imgaussfilt(moving2,3);
     
     clear moving1_temp moving2_temp
     f1_dims = size(fixed1);
     m1_dims = size(moving1);
-
+    
+%     aip1 = imread([basename1, 'mosaic_', sprintf('%03d', slice_id1), '_aip.tif']);
+% aip2 = imread([basename2, 'mosaic_', sprintf('%03d', slice_id2), '_aip.tif']);
+% 
+% mask1 = aip1 > 60;
+% mask2 = aip2 > 60;
+% applyMask = @(img, m) ...
+%     (ndims(img)==3) .* bsxfun(@times, img, cast(repmat(m,[1 1 size(img,3)]), class(img))) + ...
+%     (ndims(img)~=3) .* (img .* cast(m, class(img)));
+% 
+% % --- apply masks ---
+% fixed1  = applyMask(fixed1,  mask1);
+% fixed2  = applyMask(fixed2,  mask1);   % same mask as fixed1 (same basename/slice)
+% moving1 = applyMask(moving1, mask2);
+% moving2 = applyMask(moving2, mask2);
+    
 %     f1_xrange1 = 1;             
 %     f1_xrange2 = end; 
 % 

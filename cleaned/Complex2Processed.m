@@ -26,9 +26,6 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
 % Example:
 % Complex2Processed("complex.nii.gz","surf.nii.gz",100,3.3,"aip.nii.gz","", "", "", "biref.nii.gz", "", "", "");
 
- %% 10/05/25 CL ???
- %   V = single(V);                       % enforce single precision downstream  
-
     arguments
         input string
         surfaceFile string = ""
@@ -60,7 +57,7 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
     V = niftiread(infoIn);               % single or double; dimensions: (4*X) × Y × Z
    
     %%
-    V = single(V);                       % enforce single precision downstream  
+    % V = single(V);                       % enforce single precision downstream  
     %%
     
     % Infer dimensions and split Jones components
@@ -94,13 +91,38 @@ function Complex2Processed(input, surfaceFile, depth, zSize, aip, mip, ret, ori,
 
     % -------- Surface handling for enface & biref windows --------
     if strlength(surfaceFile) > 0
-        surf = single(niftiread(surfaceFile));     % expected X × Y of 0-based z-indices
-        if ~isequal(size(surf), [nx, ny])
-            error('Surface size mismatch: expected %dx%d, got %s.', nx, ny, mat2str(size(surf)));
+        surf = zeros(nx, ny);  % Output surface map
+    
+        w = 5;
+        w2 = 5;
+        kernel = [-ones(1, w)/w, ones(1, w2)/w2];  % Gradient kernel
+    
+        % Loop over each (x,y) A-line
+        for i = 1:nx
+            for j = 1:ny
+                line = squeeze(dBI3D_vol(i, j, :));
+                valid_len = sum(line > 0.01);
+                if valid_len > w + w2
+                    data = imgaussfilt(line(1:valid_len), 5);  % 1D Gaussian smoothing
+                    grad = -conv(data, kernel, 'valid');
+                    positions = (w+1):(valid_len-w+1);
+                    [grad_min, idx_min] = max(grad);
+                    i_min = positions(idx_min);
+                    surf(i,j) = i_min+11;
+                else
+                    surf(i,j) = 0;
+                end
+            end
         end
-        surf = surf + 1;                           % convert to MATLAB 1-based indexing
+
+        % surf = single(niftiread(surfaceFile));     % expected X × Y of 0-based z-indices
+        % if ~isequal(size(surf), [nx, ny])
+        %     error('Surface size mismatch: expected %dx%d, got %s.', nx, ny, mat2str(size(surf)));
+        % end
+        % 
+        % surf = surf + 11;                           % convert to MATLAB 1-based indexing
     else
-        surf = ones(nx,ny,'single')*100;               % "0" → index 1 in MATLAB
+        surf = ones(nx,ny,'single')*11;               % "0" → index 1 in MATLAB
     end
 
     % Clamp surfaces inside [1, nz]
@@ -294,7 +316,7 @@ function oriMap = enfaceOrientation(O3D_deg, surf, stopIdx)
     % Circular mean of 180°-periodic orientations using doubled-angle trick.
     nx = size(O3D_deg,1); ny = size(O3D_deg,2);
     oriMap = zeros(nx,ny,'single');
-
+    disp("new orientation method")
     for i = 1:nx
         for j = 1:ny
             z1 = surf(i,j); z2 = stopIdx(i,j);
@@ -319,8 +341,7 @@ function birefMap = fitBirefringence(R3D_deg, surf, stopIdx, zSize_um, lambda_um
         for y = 1:ny
             z1 = surf(x,y); z2 = stopIdx(x,y);
             if z2 < z1, z2 = z1; end
-            z1 = 1; z2 = 100;
-            rp = single(squeeze(R3D_deg(x,y,z1:z2)));
+            rp = squeeze(R3D_deg(x,y,z1:z2));
             % Stop early if zeros (e.g., crop) appear
             zZeros = find(rp==0,1,'first');
             if ~isempty(zZeros)
